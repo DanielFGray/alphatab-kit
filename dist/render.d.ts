@@ -7,17 +7,32 @@ export declare const ScoreSource: Schema.Union<readonly [Schema.TaggedStruct<"Al
     readonly bytes: Schema.Uint8Array;
 }>]>;
 export type ScoreSource = typeof ScoreSource.Type;
-declare const StaticScore_base: Schema.Class<StaticScore, Schema.Struct<{
-    readonly svg: Schema.String;
-    readonly width: Schema.Finite;
+declare const StaticPart_base: Schema.Class<StaticPart, Schema.Struct<{
+    readonly y: Schema.Finite;
     readonly height: Schema.Finite;
+    readonly svg: Schema.String;
 }>, {
     readonly brand: unique symbol;
 }>;
 /**
- * A score drawn once at a fixed width, as one `<svg>` that scales to its
- * container through its `viewBox`. The music symbols are text in alphaTab's
- * music font, so the page needs {@link musicFontCss}, or use {@link standaloneSvg}.
+ * One horizontal band of a drawn score, as alphaTab's renderer emits it: the
+ * title block, or one system of staves. `svg` is a complete `<svg>` in the
+ * band's own coordinates; `y` places it in the score.
+ */
+export declare class StaticPart extends StaticPart_base {
+}
+declare const StaticScore_base: Schema.Class<StaticScore, Schema.Struct<{
+    readonly width: Schema.Finite;
+    readonly height: Schema.Finite;
+    readonly parts: Schema.$Array<typeof StaticPart>;
+}>, {
+    readonly brand: unique symbol;
+}>;
+/**
+ * A score drawn once at a fixed width, kept as its parts so that printing can
+ * break pages between systems. The music symbols are text in alphaTab's music
+ * font: show it with {@link staticScoreHtml} on a page that carries
+ * {@link staticScoreCss}, or as one file with {@link standaloneSvg}.
  */
 export declare class StaticScore extends StaticScore_base {
 }
@@ -59,16 +74,25 @@ export declare const renderScoreSvg: (source: {
 /** {@link renderScoreSvg} for callers outside Effect. */
 export declare const renderScoreSvgPromise: (source: ScoreSource, options: RenderOptions) => Promise<StaticScore>;
 /**
- * The CSS that draws alphaTab's music symbols in a static score: the music
- * font, and the class alphaTab gives each symbol. In the browser alphaTab
- * injects the same rule itself when a player starts; a static score has no
- * player, so the page must carry it.
+ * The parts stacked as block-level `<svg>` elements inside one
+ * `.at-surface.at` element. Each part's view box also covers the gap above it,
+ * so the stack keeps the score's spacing at any width. alphaTab escapes the
+ * text it draws, so the markup is safe to insert into a page.
  */
-export declare const musicFontCss: (fontDirectory: string) => string;
+export declare const staticScoreHtml: (score: StaticScore) => string;
+/** The score as one `<svg>` element, for a file or an image. */
+export declare const scoreSvg: (score: StaticScore) => string;
 /**
  * The score as a file of its own, with its music-font CSS inside, for a page
- * opened directly or printed. A browser loads no fonts for an SVG shown
- * through `<img>`; use a PNG there.
+ * opened directly. A browser loads no fonts for an SVG shown through `<img>`;
+ * use a PNG there.
  */
 export declare const standaloneSvg: (score: StaticScore, fontDirectory: string) => string;
+/**
+ * The CSS a page needs to show {@link staticScoreHtml}: the music font and
+ * alphaTab's text rules, which alphaTab injects itself only when a player
+ * starts, and one block per part so that printing breaks pages between
+ * systems.
+ */
+export declare const staticScoreCss: (fontDirectory: string) => string;
 export {};
