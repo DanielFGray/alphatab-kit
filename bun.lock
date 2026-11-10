@@ -4,15 +4,13 @@
   "workspaces": {
     "": {
       "name": "alphatab-kit",
-      "dependencies": {
-        "effect": "4.1.2",
-      },
       "devDependencies": {
         "@coderline/alphatab": "1.9.0-alpha.1891",
         "@effect/tsgo": "0.67.7",
         "@types/bun": "^1.4.4",
         "@types/node": "^26.2.0",
         "@types/react": "^19.3.0",
+        "effect": "4.1.2",
         "oxlint": "1.93.0",
         "oxlint-tsgolint": "7.0.2006",
         "react": "^19.3.1",

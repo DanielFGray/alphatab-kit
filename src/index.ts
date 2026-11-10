@@ -1,6 +1,6 @@
 export const ALPHATAB_PACKAGE = "@coderline/alphatab"
 
-/** Where the Vite plugin serves alphaTab's runtime files. */
+/** Where the Vite plugin serves alphaTab's fonts, sound font and UMD script. */
 export const ALPHATAB_BASE = "/alphatab/"
 
 export interface AlphaTabAssetUrls {
@@ -11,8 +11,10 @@ export interface AlphaTabAssetUrls {
 
 /**
  * The URLs to pass to alphaTab settings (`core.scriptFile`, `core.fontDirectory`,
- * `player.soundFont`). They are absolute because alphaTab fetches them from a
- * worker, where a relative URL resolves against the worker's own location.
+ * `player.soundFont`), for files the `alphatab-kit/vite` plugin serves.
+ * `scriptFile` must be absolute: alphaTab loads it inside a worker started from
+ * a blob URL, where a relative URL has no base to resolve against.
+ * Call it in the browser only; it reads `location`.
  */
 export function alphaTabAssetUrls(origin: string = location.origin): AlphaTabAssetUrls {
   return {

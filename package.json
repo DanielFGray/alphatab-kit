@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
-    "prepare": "effect-tsgo patch --typescript --oxlint && tsc -p tsconfig.build.json",
+    "prepare": "effect-tsgo patch --typescript --oxlint",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "lint": "oxlint --type-aware"
@@ -31,15 +31,13 @@
     "react": "^19.0.0",
     "vite": ">=6"
   },
-  "dependencies": {
-    "effect": "4.1.2"
-  },
   "devDependencies": {
     "@coderline/alphatab": "1.9.0-alpha.1891",
     "@effect/tsgo": "0.67.7",
     "@types/bun": "^1.4.4",
     "@types/node": "^26.2.0",
     "@types/react": "^19.3.0",
+    "effect": "4.1.2",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2006",
     "react": "^19.3.1",
@@ -47,6 +45,10 @@
     "vite": "^8.1.5"
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "patches"
+  ],
+  "bin": {
+    "alphatab-kit": "./dist/bin.js"
+  }
 }
