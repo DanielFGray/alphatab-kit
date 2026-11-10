@@ -14,3 +14,7 @@ Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
 
 If you need to learn more about particular Effect apis and concepts that the
 guide doesn't cover, search through the source code in `node_modules/effect/src`.
+
+# Patches
+
+`patches/alphatab-<version>.patch` is the one patch of `@coderline/alphatab` for every consumer. A consumer sets `patchedDependencies` to `../alphatab-kit/patches/<file>` and pins alphaTab to the same version; bun applies the patch from outside the project. It holds: lyric skipping past tied notes and GP5 percussion fallback (from setlist), and pointer events plus tempo-after-seek in the sequencer (from dfg.rocks). The patch fails on any other alphaTab version: port the hunks to the new `dist` (whitespace and quote style differ between releases) and rename the file.
