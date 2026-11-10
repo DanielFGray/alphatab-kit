@@ -6,7 +6,12 @@ import { staticScoreCss, staticScoreHtml, type StaticScore } from "./static.ts"
 export interface StaticScoreFrameProps {
   /** The score drawn ahead of time, on the server or at build time. */
   readonly score: StaticScore
-  /** True once the player inside has drawn the score. */
+  /**
+   * True once the player inside has drawn its first part: set it from
+   * `api.renderer.partialRenderFinished`. `renderFinished` is too early, because
+   * with lazy loading it fires when the layout is done and before any part is
+   * drawn, so the frame would show an empty player.
+   */
   readonly playerReady: boolean
   /** Where the page serves alphaTab's fonts. Defaults to where the kit's Vite plugin serves them. */
   readonly fontDirectory?: string
