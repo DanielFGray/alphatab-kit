@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Effect } from "effect"
-import { renderScoreSvg, scoreSvg, standaloneSvg, staticScoreHtml } from "./render.ts"
+import { renderScoreSvg } from "./render.ts"
+import { scoreSvg, standaloneSvg, staticScoreHtml } from "./static.ts"
 
 const tex = `\\title "Probe" . :4 0.6 2.5 2.4 0.3 | 3.3 2.3 0.4 r`
 const long = `. ${Array.from({ length: 24 }, () => ":4 0.6 2.5 2.4 0.3").join(" | ")}`
