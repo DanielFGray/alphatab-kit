@@ -14,6 +14,7 @@ import { displayForWidth } from "../charts/score-layout.ts"
 import { defaultNotation, staffNotation, toggleNotation, type Notation } from "../charts/score-notation.ts"
 import { clampZoom } from "../charts/score-zoom.ts"
 import { trackOptions, type TrackOption } from "../charts/score-tracks.ts"
+import { REPORT_THRESHOLD_MS, STOPPED_CLOCK, start, stop, takeWholeSeconds, tick } from "../charts/practice-time.ts"
 import { clampSpeed, nextSpeed, type StepMode } from "../charts/speed-trainer.ts"
 import type { KeyPress } from "./keyboard.ts"
 
@@ -142,6 +143,11 @@ export interface ScorePlayerOptions {
   readonly notation?: Notation
   /** Called with the new notation after `setNotation`, not when a load or `setTrack` sets it. */
   readonly onNotationChange?: (notation: Notation) => void
+  /**
+   * Called with whole seconds of playing time not yet reported: about every five seconds while playing, and with the
+   * rest when playback stops, pauses, finishes, or a new score loads. The app adds them up; the player keeps no total.
+   */
+  readonly onPracticeTime?: (seconds: number) => void
 }
 
 /** The display settings the player writes: how large alphaTab draws, and how tightly it packs bars. */
@@ -259,10 +265,17 @@ export interface PlayerApi {
  * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
  * only once a score is loaded: before that the settings are set and the first draw uses them.
  *
+ * Practice time counts from alphaTab's Playing state, and is measured with `now` (milliseconds; a test passes a
+ * fake clock). It is reported at position events, so no timer runs here.
+ *
  * `options.trackLabel` and the `on...Change` callbacks are read when they are needed, not at creation, so a
  * caller can pass an object whose getters return its latest callbacks.
  */
-export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = {}): ScorePlayer {
+export function createScorePlayer(
+  api: PlayerApi,
+  options: ScorePlayerOptions = {},
+  now: () => number = () => performance.now(),
+): ScorePlayer {
   let state: ScorePlayerState = {
     status: "loading",
     error: null,
@@ -307,6 +320,24 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     if ((Object.keys(patch) as Array<keyof ScorePlayerState>).every((key) => state[key] === next[key])) return
     state = next
     for (const listener of listeners) listener()
+  }
+
+  // Practice time: whole seconds are taken from the clock and handed to the app; the player keeps no total.
+  let clock = STOPPED_CLOCK
+  const reportPractice = (minMs: number) => {
+    const taken = takeWholeSeconds(clock, minMs)
+    clock = taken.clock
+    if (taken.seconds > 0) options.onPracticeTime?.(taken.seconds)
+  }
+  // Reports what is pending and stops the clock: the next Playing event starts it again.
+  const stopPractice = () => {
+    clock = stop(clock, now())
+    reportPractice(0)
+  }
+  // Reports what is pending and lets the clock run on, for an event after which playback may continue.
+  const settlePractice = () => {
+    clock = tick(clock, now())
+    reportPractice(0)
   }
 
   const fail = (message: string) => update({ status: "error", error: message })
@@ -496,9 +527,20 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
       applyTrackMixer(state.mixer)
       update({ playerReady: true })
     }),
-    api.playerStateChanged.on((event) => update({ playing: event.state === synth.PlayerState.Playing })),
-    api.playerPositionChanged.on((event) => update({ positionMs: event.currentTime, endMs: event.endTime })),
+    api.playerStateChanged.on((event) => {
+      const playing = event.state === synth.PlayerState.Playing
+      if (playing) clock = start(clock, now())
+      else stopPractice()
+      update({ playing })
+    }),
+    api.playerPositionChanged.on((event) => {
+      clock = tick(clock, now())
+      reportPractice(REPORT_THRESHOLD_MS)
+      update({ positionMs: event.currentTime, endMs: event.endTime })
+    }),
     api.playerFinished.on(() => {
+      // A looping player fires this and plays on without a state change, so the clock keeps running.
+      settlePractice()
       if (!state.trainer.loop) return
       finishedRounds += 1
       if (finishedRounds < Math.max(1, state.trainer.loopCount)) return
@@ -526,6 +568,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
       return () => listeners.delete(listener)
     },
     load: (source) => {
+      stopPractice()
       update({ status: "loading", error: null, rendered: false })
       dropSelection()
       if ("tex" in source) return api.tex(source.tex)
@@ -574,6 +617,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     setStepValue: (value) => setTrainer({ stepValue: value }),
     setTrack: (index) => {
       if (index === state.track) return
+      settlePractice()
       dropSelection()
       drawTrack(index)
     },
@@ -627,6 +671,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
       return true
     },
     dispose: () => {
+      stopPractice()
       for (const unsubscribe of unsubscribers) unsubscribe()
       listeners.clear()
     },

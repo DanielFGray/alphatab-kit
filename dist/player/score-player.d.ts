@@ -129,6 +129,11 @@ export interface ScorePlayerOptions {
     readonly notation?: Notation;
     /** Called with the new notation after `setNotation`, not when a load or `setTrack` sets it. */
     readonly onNotationChange?: (notation: Notation) => void;
+    /**
+     * Called with whole seconds of playing time not yet reported: about every five seconds while playing, and with the
+     * rest when playback stops, pauses, finishes, or a new score loads. The app adds them up; the player keeps no total.
+     */
+    readonly onPracticeTime?: (seconds: number) => void;
 }
 /** The display settings the player writes: how large alphaTab draws, and how tightly it packs bars. */
 export interface DisplaySettings {
@@ -263,7 +268,10 @@ export interface PlayerApi {
  * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
  * only once a score is loaded: before that the settings are set and the first draw uses them.
  *
+ * Practice time counts from alphaTab's Playing state, and is measured with `now` (milliseconds; a test passes a
+ * fake clock). It is reported at position events, so no timer runs here.
+ *
  * `options.trackLabel` and the `on...Change` callbacks are read when they are needed, not at creation, so a
  * caller can pass an object whose getters return its latest callbacks.
  */
-export declare function createScorePlayer(api: PlayerApi, options?: ScorePlayerOptions): ScorePlayer;
+export declare function createScorePlayer(api: PlayerApi, options?: ScorePlayerOptions, now?: () => number): ScorePlayer;

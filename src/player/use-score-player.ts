@@ -74,6 +74,9 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
       get onNotationChange() {
         return latest.current.onNotationChange
       },
+      get onPracticeTime() {
+        return latest.current.onPracticeTime
+      },
     }
     const created = createScorePlayer(api, live)
     setPlayer(created)

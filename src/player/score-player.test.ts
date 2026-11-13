@@ -847,3 +847,110 @@ test("a new score or track drops the selection", () => {
   api.scoreLoaded.emit({ tempo: 120 })
   expect(player.getState().selection).toBeNull()
 })
+
+/** A player with a fake clock, and the seconds it reported. */
+function practiced() {
+  const { api } = fakeApi()
+  const reported: number[] = []
+  let time = 1000
+  const player = createScorePlayer(api, { onPracticeTime: (seconds) => reported.push(seconds) }, () => time)
+  const at = (ms: number) => void (time = 1000 + ms)
+  const position = () => api.playerPositionChanged.emit({ currentTime: 0, endTime: 60000 })
+  const playing = () => api.playerStateChanged.emit({ state: synth.PlayerState.Playing })
+  const paused = () => api.playerStateChanged.emit({ state: synth.PlayerState.Paused })
+  return { api, player, reported, at, position, playing, paused }
+}
+
+test("12 seconds of play report 10 at the threshold, then the rest at the stop", () => {
+  const { reported, at, position, playing, paused } = practiced()
+  playing()
+  at(4000)
+  position()
+  expect(reported).toEqual([])
+  at(10000)
+  position()
+  expect(reported).toEqual([10])
+  at(12000)
+  paused()
+  expect(reported).toEqual([10, 2])
+})
+
+test("pause stops the clock, and position events while stopped count nothing", () => {
+  const { reported, at, position, playing, paused } = practiced()
+  playing()
+  at(3000)
+  paused()
+  expect(reported).toEqual([3])
+  at(20000)
+  position()
+  at(40000)
+  position()
+  expect(reported).toEqual([3])
+  playing()
+  at(41000)
+  paused()
+  expect(reported).toEqual([3, 1])
+})
+
+test("a stop under one second reports nothing, and the remainder carries to the next stop", () => {
+  const { reported, at, playing, paused } = practiced()
+  playing()
+  at(600)
+  paused()
+  expect(reported).toEqual([])
+  playing()
+  at(1100)
+  paused()
+  expect(reported).toEqual([1])
+})
+
+test("load and dispose report what is pending", () => {
+  const { player, reported, at, playing } = practiced()
+  playing()
+  at(2000)
+  player.load({ url: "/next.gp" })
+  expect(reported).toEqual([2])
+  playing()
+  at(5000)
+  player.dispose()
+  expect(reported).toEqual([2, 3])
+})
+
+test("a track change and a finished pass report, and a looping player keeps counting", () => {
+  const { api, player, reported, at, playing } = practiced()
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  playing()
+  at(2000)
+  player.setTrack(1)
+  expect(reported).toEqual([2])
+  at(5000)
+  api.playerFinished.emit()
+  expect(reported).toEqual([2, 3])
+  at(7000)
+  api.playerFinished.emit()
+  expect(reported).toEqual([2, 3, 2])
+})
+
+test("the practice callback is read when it is called, and none set means no report", () => {
+  const { api } = fakeApi()
+  const calls: string[] = []
+  let current: ((seconds: number) => void) | undefined
+  let time = 0
+  createScorePlayer(
+    api,
+    {
+      get onPracticeTime() {
+        return current
+      },
+    },
+    () => time,
+  )
+  api.playerStateChanged.emit({ state: synth.PlayerState.Playing })
+  time = 2000
+  api.playerStateChanged.emit({ state: synth.PlayerState.Paused })
+  current = (seconds) => calls.push(`late:${seconds}`)
+  api.playerStateChanged.emit({ state: synth.PlayerState.Playing })
+  time = 5000
+  api.playerStateChanged.emit({ state: synth.PlayerState.Paused })
+  expect(calls).toEqual(["late:3"])
+})
