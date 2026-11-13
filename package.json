@@ -24,6 +24,10 @@
     "./static": {
       "types": "./dist/static.d.ts",
       "default": "./dist/static.js"
+    },
+    "./charts/*": {
+      "types": "./dist/charts/*.d.ts",
+      "default": "./dist/charts/*.js"
     }
   },
   "scripts": {
@@ -54,7 +58,8 @@
     "react": "^19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "@types/diff-match-patch": "1.0.36"
   },
   "files": [
     "dist",
@@ -67,5 +72,10 @@
     "effect": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "chordsheetjs": "18.0.0",
+    "diff-match-patch": "1.0.5",
+    "perfect-freehand": "1.2.3"
   }
 }
