@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlphaTabApi, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
+import { createMixer } from "../charts/score-mixer.js";
 import { createScorePlayer, DEFAULT_TRAINER, } from "./score-player.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
@@ -30,7 +31,17 @@ export function useScorePlayer(options) {
         settings.player.soundFont = urls.soundFont;
         configure?.(settings);
         const api = new AlphaTabApi(element, settings);
-        const created = createScorePlayer(api, initial);
+        // Getters, so a callback from a later render is the one called: this controller is built once.
+        const live = {
+            ...initial,
+            get trackLabel() {
+                return latest.current.trackLabel;
+            },
+            get onMixerChange() {
+                return latest.current.onMixerChange;
+            },
+        };
+        const created = createScorePlayer(api, live);
         setPlayer(created);
         created.load(current);
         return () => {
@@ -55,6 +66,9 @@ const INITIAL_STATE = {
     speed: 1,
     tempo: null,
     trainer: DEFAULT_TRAINER,
+    tracks: [],
+    track: null,
+    mixer: createMixer([]),
 };
 const subscribeNothing = () => () => { };
 const noop = () => { };
@@ -72,4 +86,9 @@ const INERT_ACTIONS = {
     setLoopCount: noop,
     setStepMode: noop,
     setStepValue: noop,
+    setTrack: noop,
+    setMasterVolume: noop,
+    setTrackVolume: noop,
+    setSolo: noop,
+    setMute: noop,
 };

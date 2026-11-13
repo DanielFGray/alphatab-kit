@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react"
 import { AlphaTabApi, Settings } from "@coderline/alphatab"
 import { alphaTabAssetUrls } from "../index.ts"
+import { createMixer } from "../charts/score-mixer.ts"
 import {
   createScorePlayer,
   DEFAULT_TRAINER,
@@ -56,7 +57,17 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     settings.player.soundFont = urls.soundFont
     configure?.(settings)
     const api = new AlphaTabApi(element, settings)
-    const created = createScorePlayer(api, initial)
+    // Getters, so a callback from a later render is the one called: this controller is built once.
+    const live: ScorePlayerOptions = {
+      ...initial,
+      get trackLabel() {
+        return latest.current.trackLabel
+      },
+      get onMixerChange() {
+        return latest.current.onMixerChange
+      },
+    }
+    const created = createScorePlayer(api, live)
     setPlayer(created)
     created.load(current)
     return () => {
@@ -87,6 +98,9 @@ const INITIAL_STATE: ScorePlayerState = {
   speed: 1,
   tempo: null,
   trainer: DEFAULT_TRAINER,
+  tracks: [],
+  track: null,
+  mixer: createMixer([]),
 }
 
 const subscribeNothing = () => () => {}
@@ -107,4 +121,9 @@ const INERT_ACTIONS: ScorePlayerActions = {
   setLoopCount: noop,
   setStepMode: noop,
   setStepValue: noop,
+  setTrack: noop,
+  setMasterVolume: noop,
+  setTrackVolume: noop,
+  setSolo: noop,
+  setMute: noop,
 }

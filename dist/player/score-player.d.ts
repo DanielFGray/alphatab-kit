@@ -1,3 +1,5 @@
+import { type Mixer } from "../charts/score-mixer.ts";
+import { type TrackOption } from "../charts/score-tracks.ts";
 import { type StepMode } from "../charts/speed-trainer.ts";
 /** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
 export type ScoreSource = {
@@ -35,6 +37,12 @@ export interface ScorePlayerState {
     /** The score's tempo at `speed`, rounded to a tenth; null when the score names none. */
     readonly tempo: number | null;
     readonly trainer: TrainerState;
+    /** The score's tracks; empty until a score loads. */
+    readonly tracks: ReadonlyArray<TrackOption>;
+    /** The index of the track drawn; null before a score loads. */
+    readonly track: number | null;
+    /** Master volume and each track's volume, solo and mute. Holds the saved settings until a score loads. */
+    readonly mixer: Mixer;
 }
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
 export interface ScorePlayerActions {
@@ -53,6 +61,13 @@ export interface ScorePlayerActions {
     setLoopCount: (count: number) => void;
     setStepMode: (mode: StepMode) => void;
     setStepValue: (value: number) => void;
+    /** Draws only this track and restarts the trainer's loop count. An index outside the score is ignored. */
+    setTrack: (index: number) => void;
+    /** Volumes are clamped to 0..1. Each mixer action calls `onMixerChange`; a track index outside the score throws a RangeError. */
+    setMasterVolume: (volume: number) => void;
+    setTrackVolume: (track: number, volume: number) => void;
+    setSolo: (track: number, solo: boolean) => void;
+    setMute: (track: number, mute: boolean) => void;
 }
 /** A score player: a state snapshot, a subscription to its changes, and the actions. */
 export interface ScorePlayer extends ScorePlayerActions {
@@ -73,6 +88,24 @@ export interface ScorePlayerOptions {
     readonly loopCount?: number;
     readonly stepMode?: StepMode;
     readonly stepValue?: number;
+    /** Builds a track's label; the default is the trimmed name, or "Track n" when it is blank. */
+    readonly trackLabel?: (track: PlayerTrack, index: number) => string;
+    /** The track drawn first. An index outside the score falls back to 0. */
+    readonly defaultTrack?: number;
+    /** Saved settings, fitted to the score on load. Without them each track starts at its file's volume. */
+    readonly mixer?: Mixer;
+    /** Called with the new mixer after a user action changes it, not when the load fits it. */
+    readonly onMixerChange?: (mixer: Mixer) => void;
+}
+/** The part of an alphaTab `Track` the controller reads. */
+export interface PlayerTrack {
+    readonly index: number;
+    readonly name: string;
+    readonly shortName: string;
+    /** `volume` is the file's own track volume, 0 to 16. */
+    readonly playbackInfo: {
+        readonly volume: number;
+    };
 }
 /** An alphaTab event without a payload, as the API exposes it. */
 export interface PlayerEvent {
@@ -89,6 +122,7 @@ export interface PlayerEventOf<T> {
 export interface PlayerApi {
     readonly scoreLoaded: PlayerEventOf<{
         readonly tempo: number;
+        readonly tracks: ReadonlyArray<PlayerTrack>;
     }>;
     readonly renderStarted: PlayerEventOf<boolean>;
     readonly postRenderFinished: PlayerEvent;
@@ -117,6 +151,13 @@ export interface PlayerApi {
     countInVolume: number;
     playbackSpeed: number;
     isLooping: boolean;
+    masterVolume: number;
+    /** Takes effect only once the player exists: alphaTab drops these three before `playerReady`. */
+    changeTrackVolume(tracks: PlayerTrack[], volume: number): void;
+    changeTrackSolo(tracks: PlayerTrack[], solo: boolean): void;
+    changeTrackMute(tracks: PlayerTrack[], mute: boolean): void;
+    /** Draws only these tracks. The sound is unchanged: alphaTab makes the MIDI from the whole score. */
+    renderTracks(tracks: PlayerTrack[]): void;
 }
 /**
  * Drives `api`: it listens to alphaTab's events and keeps the state from them, and its actions call the API.
@@ -130,5 +171,8 @@ export interface PlayerApi {
  *
  * The trainer's loop count lives here, not in the state: it is progress, not a setting. Stop, seek, a
  * loop toggle and a speed the player chose restart it, so a count never carries across a jump.
+ *
+ * `options.trackLabel` and `options.onMixerChange` are read when they are needed, not at creation, so a
+ * caller can pass an object whose getters return its latest callbacks.
  */
 export declare function createScorePlayer(api: PlayerApi, options?: ScorePlayerOptions): ScorePlayer;

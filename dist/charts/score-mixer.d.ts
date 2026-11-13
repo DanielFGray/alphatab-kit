@@ -17,8 +17,13 @@ export type Mixer = {
     readonly master: number;
     readonly tracks: ReadonlyArray<TrackMix>;
 };
-/** A mixer for `trackCount` tracks at normal volume, nothing soloed or muted. */
-export declare function createMixer(trackCount: number): Mixer;
+/**
+ * A mixer with one track per entry of `fileVolumes`, nothing soloed or muted. The master is at normal
+ * volume. Each track starts at the volume its file gives it (alphaTab's `playbackInfo.volume / 16`),
+ * because setting a track's volume replaces that value rather than scaling it: a default of 1 would
+ * overwrite the file's own balance between tracks.
+ */
+export declare function createMixer(fileVolumes: ReadonlyArray<number>): Mixer;
 /** The mixer with the master volume set, clamped to the range alphaTab accepts. */
 export declare function setMaster(mixer: Mixer, master: number): Mixer;
 /** The mixer with one track's volume set, clamped to the range alphaTab accepts. Throws a RangeError for an index outside the score. */
@@ -28,11 +33,11 @@ export declare function setSolo(mixer: Mixer, track: number, solo: boolean): Mix
 /** The mixer with one track's mute flag set. Stored as given: which tracks are audible is alphaTab's decision. Throws a RangeError for an index outside the score. */
 export declare function setMute(mixer: Mixer, track: number, mute: boolean): Mixer;
 /**
- * Makes saved settings fit a score with `trackCount` tracks. Tracks past the
- * score's end are dropped, missing tracks get defaults, and volumes are
- * clamped. A saved mixer can come from an older revision of the score, so
- * its track count is not trusted.
+ * Makes saved settings fit a score whose tracks have the volumes `fileVolumes` (one entry per track).
+ * Tracks past the score's end are dropped, missing tracks get the file's volume as in `createMixer`,
+ * and volumes are clamped. A saved mixer can come from an older revision of the score, so its track
+ * count is not trusted.
  */
-export declare function fitMixer(saved: Mixer, trackCount: number): Mixer;
+export declare function fitMixer(saved: Mixer, fileVolumes: ReadonlyArray<number>): Mixer;
 /** A volume inside the range alphaTab accepts. A value that is not a number becomes normal volume. */
 export declare function clampVolume(volume: number): number;

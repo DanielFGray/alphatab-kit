@@ -1,4 +1,14 @@
 import { synth } from "@coderline/alphatab"
+import {
+  createMixer,
+  fitMixer,
+  setMaster,
+  setMute,
+  setSolo,
+  setTrackVolume,
+  type Mixer,
+} from "../charts/score-mixer.ts"
+import { trackOptions, type TrackOption } from "../charts/score-tracks.ts"
 import { clampSpeed, nextSpeed, type StepMode } from "../charts/speed-trainer.ts"
 
 /** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
@@ -34,6 +44,12 @@ export interface ScorePlayerState {
   /** The score's tempo at `speed`, rounded to a tenth; null when the score names none. */
   readonly tempo: number | null
   readonly trainer: TrainerState
+  /** The score's tracks; empty until a score loads. */
+  readonly tracks: ReadonlyArray<TrackOption>
+  /** The index of the track drawn; null before a score loads. */
+  readonly track: number | null
+  /** Master volume and each track's volume, solo and mute. Holds the saved settings until a score loads. */
+  readonly mixer: Mixer
 }
 
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
@@ -53,6 +69,13 @@ export interface ScorePlayerActions {
   setLoopCount: (count: number) => void
   setStepMode: (mode: StepMode) => void
   setStepValue: (value: number) => void
+  /** Draws only this track and restarts the trainer's loop count. An index outside the score is ignored. */
+  setTrack: (index: number) => void
+  /** Volumes are clamped to 0..1. Each mixer action calls `onMixerChange`; a track index outside the score throws a RangeError. */
+  setMasterVolume: (volume: number) => void
+  setTrackVolume: (track: number, volume: number) => void
+  setSolo: (track: number, solo: boolean) => void
+  setMute: (track: number, mute: boolean) => void
 }
 
 /** A score player: a state snapshot, a subscription to its changes, and the actions. */
@@ -75,6 +98,23 @@ export interface ScorePlayerOptions {
   readonly loopCount?: number
   readonly stepMode?: StepMode
   readonly stepValue?: number
+  /** Builds a track's label; the default is the trimmed name, or "Track n" when it is blank. */
+  readonly trackLabel?: (track: PlayerTrack, index: number) => string
+  /** The track drawn first. An index outside the score falls back to 0. */
+  readonly defaultTrack?: number
+  /** Saved settings, fitted to the score on load. Without them each track starts at its file's volume. */
+  readonly mixer?: Mixer
+  /** Called with the new mixer after a user action changes it, not when the load fits it. */
+  readonly onMixerChange?: (mixer: Mixer) => void
+}
+
+/** The part of an alphaTab `Track` the controller reads. */
+export interface PlayerTrack {
+  readonly index: number
+  readonly name: string
+  readonly shortName: string
+  /** `volume` is the file's own track volume, 0 to 16. */
+  readonly playbackInfo: { readonly volume: number }
 }
 
 /** An alphaTab event without a payload, as the API exposes it. */
@@ -92,7 +132,7 @@ export interface PlayerEventOf<T> {
  * a plain object. A later feature adds the members it needs here, so this stays the smallest true list.
  */
 export interface PlayerApi {
-  readonly scoreLoaded: PlayerEventOf<{ readonly tempo: number }>
+  readonly scoreLoaded: PlayerEventOf<{ readonly tempo: number; readonly tracks: ReadonlyArray<PlayerTrack> }>
   readonly renderStarted: PlayerEventOf<boolean>
   readonly postRenderFinished: PlayerEvent
   readonly playerReady: PlayerEvent
@@ -113,6 +153,13 @@ export interface PlayerApi {
   countInVolume: number
   playbackSpeed: number
   isLooping: boolean
+  masterVolume: number
+  /** Takes effect only once the player exists: alphaTab drops these three before `playerReady`. */
+  changeTrackVolume(tracks: PlayerTrack[], volume: number): void
+  changeTrackSolo(tracks: PlayerTrack[], solo: boolean): void
+  changeTrackMute(tracks: PlayerTrack[], mute: boolean): void
+  /** Draws only these tracks. The sound is unchanged: alphaTab makes the MIDI from the whole score. */
+  renderTracks(tracks: PlayerTrack[]): void
 }
 
 /**
@@ -127,6 +174,9 @@ export interface PlayerApi {
  *
  * The trainer's loop count lives here, not in the state: it is progress, not a setting. Stop, seek, a
  * loop toggle and a speed the player chose restart it, so a count never carries across a jump.
+ *
+ * `options.trackLabel` and `options.onMixerChange` are read when they are needed, not at creation, so a
+ * caller can pass an object whose getters return its latest callbacks.
  */
 export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = {}): ScorePlayer {
   let state: ScorePlayerState = {
@@ -141,6 +191,9 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     countIn: options.countIn ?? false,
     speed: clampSpeed(options.speed ?? 1),
     tempo: null,
+    tracks: [],
+    track: null,
+    mixer: options.mixer ?? createMixer([]),
     trainer: {
       loop: options.loop ?? DEFAULT_TRAINER.loop,
       loopCount: options.loopCount ?? DEFAULT_TRAINER.loopCount,
@@ -153,6 +206,8 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
   let baseTempo: number | null = null
   // Loops of the passage finished since the trainer's count last restarted.
   let finishedRounds = 0
+  // The loaded score's tracks, as alphaTab needs them to draw one or change its mixer.
+  let scoreTracks: ReadonlyArray<PlayerTrack> = []
 
   const update = (patch: Partial<ScorePlayerState>) => {
     const next = { ...state, ...patch }
@@ -178,6 +233,31 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     if (changed) update({ trainer: { ...state.trainer, ...patch } })
   }
 
+  // Sends a mixer's track settings to alphaTab, which has them only once its player exists.
+  const applyTrackMixer = (mixer: Mixer) => {
+    mixer.tracks.forEach((mix, index) => {
+      const track = scoreTracks[index]
+      if (!track) return
+      api.changeTrackVolume([track], mix.volume)
+      api.changeTrackSolo([track], mix.solo)
+      api.changeTrackMute([track], mix.mute)
+    })
+  }
+
+  // A mixer action by the user: keep the new mixer, tell alphaTab, then tell the app so it can save it.
+  const changeMixer = (next: Mixer, send: () => void) => {
+    update({ mixer: next })
+    send()
+    options.onMixerChange?.(next)
+  }
+
+  const drawTrack = (index: number) => {
+    const track = scoreTracks[index]
+    if (!track) return
+    api.renderTracks([track])
+    update({ track: index })
+  }
+
   // alphaTab keeps these volumes and the speed until its player exists, so they can be set now.
   api.metronomeVolume = state.metronome ? 1 : 0
   api.countInVolume = state.countIn ? 1 : 0
@@ -187,11 +267,31 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
   const unsubscribers = [
     api.scoreLoaded.on((score) => {
       baseTempo = score.tempo > 0 ? score.tempo : null
-      update({ status: "ready", error: null, tempo: tempoAt(state.speed) })
+      scoreTracks = score.tracks
+      const fileVolumes = scoreTracks.map((track) => track.playbackInfo.volume / 16)
+      const mixer = options.mixer ? fitMixer(options.mixer, fileVolumes) : createMixer(fileVolumes)
+      const wanted = options.defaultTrack ?? 0
+      const first = Number.isInteger(wanted) && wanted >= 0 && wanted < scoreTracks.length ? wanted : 0
+      api.masterVolume = mixer.master
+      update({
+        status: "ready",
+        error: null,
+        tempo: tempoAt(state.speed),
+        tracks: trackOptions(scoreTracks, options.trackLabel),
+        track: scoreTracks.length > 0 ? first : null,
+        mixer,
+      })
+      // alphaTab chose track 0 for this load and draws after this event. renderTracks switches the
+      // track first, at the cost of one extra draw (the load still runs its own).
+      if (first !== 0) api.renderTracks([scoreTracks[first]!])
     }),
     api.renderStarted.on(() => update({ rendered: false })),
     api.postRenderFinished.on(() => update({ rendered: true })),
-    api.playerReady.on(() => update({ playerReady: true })),
+    // alphaTab's own handler runs first and sets each track to its file's volume; ours then wins.
+    api.playerReady.on(() => {
+      applyTrackMixer(state.mixer)
+      update({ playerReady: true })
+    }),
     api.playerStateChanged.on((event) => update({ playing: event.state === synth.PlayerState.Playing })),
     api.playerPositionChanged.on((event) => update({ positionMs: event.currentTime, endMs: event.endTime })),
     api.playerFinished.on(() => {
@@ -257,6 +357,27 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     setLoopCount: (count) => setTrainer({ loopCount: count }),
     setStepMode: (mode) => setTrainer({ stepMode: mode }),
     setStepValue: (value) => setTrainer({ stepValue: value }),
+    setTrack: (index) => {
+      if (index === state.track) return
+      finishedRounds = 0
+      drawTrack(index)
+    },
+    setMasterVolume: (volume) => {
+      const next = setMaster(state.mixer, volume)
+      changeMixer(next, () => {
+        api.masterVolume = next.master
+      })
+    },
+    setTrackVolume: (track, volume) => {
+      const next = setTrackVolume(state.mixer, track, volume)
+      changeMixer(next, () => api.changeTrackVolume([scoreTracks[track]!], next.tracks[track]!.volume))
+    },
+    setSolo: (track, solo) => {
+      changeMixer(setSolo(state.mixer, track, solo), () => api.changeTrackSolo([scoreTracks[track]!], solo))
+    },
+    setMute: (track, mute) => {
+      changeMixer(setMute(state.mixer, track, mute), () => api.changeTrackMute([scoreTracks[track]!], mute))
+    },
     dispose: () => {
       for (const unsubscribe of unsubscribers) unsubscribe()
       listeners.clear()

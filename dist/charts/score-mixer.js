@@ -7,11 +7,16 @@
 export const MIN_VOLUME = 0;
 /** Highest volume alphaTab accepts. Its `masterVolume` and `changeTrackVolume` docs both say "percent (0-1)". */
 export const MAX_VOLUME = 1;
-/** A mixer for `trackCount` tracks at normal volume, nothing soloed or muted. */
-export function createMixer(trackCount) {
+/**
+ * A mixer with one track per entry of `fileVolumes`, nothing soloed or muted. The master is at normal
+ * volume. Each track starts at the volume its file gives it (alphaTab's `playbackInfo.volume / 16`),
+ * because setting a track's volume replaces that value rather than scaling it: a default of 1 would
+ * overwrite the file's own balance between tracks.
+ */
+export function createMixer(fileVolumes) {
     return {
         master: 1,
-        tracks: Array.from({ length: trackCount }, defaultTrack),
+        tracks: fileVolumes.map((fileVolume) => defaultTrack(fileVolume)),
     };
 }
 /** The mixer with the master volume set, clamped to the range alphaTab accepts. */
@@ -31,18 +36,18 @@ export function setMute(mixer, track, mute) {
     return updateTrack(mixer, track, { mute });
 }
 /**
- * Makes saved settings fit a score with `trackCount` tracks. Tracks past the
- * score's end are dropped, missing tracks get defaults, and volumes are
- * clamped. A saved mixer can come from an older revision of the score, so
- * its track count is not trusted.
+ * Makes saved settings fit a score whose tracks have the volumes `fileVolumes` (one entry per track).
+ * Tracks past the score's end are dropped, missing tracks get the file's volume as in `createMixer`,
+ * and volumes are clamped. A saved mixer can come from an older revision of the score, so its track
+ * count is not trusted.
  */
-export function fitMixer(saved, trackCount) {
+export function fitMixer(saved, fileVolumes) {
     return {
         master: clampVolume(saved.master),
-        tracks: Array.from({ length: trackCount }, (_, index) => {
+        tracks: fileVolumes.map((fileVolume, index) => {
             const track = saved.tracks[index];
             if (!track)
-                return defaultTrack();
+                return defaultTrack(fileVolume);
             return { ...track, volume: clampVolume(track.volume) };
         }),
     };
@@ -53,8 +58,8 @@ export function clampVolume(volume) {
         return 1;
     return Math.min(MAX_VOLUME, Math.max(MIN_VOLUME, volume));
 }
-function defaultTrack() {
-    return { volume: 1, solo: false, mute: false };
+function defaultTrack(fileVolume) {
+    return { volume: clampVolume(fileVolume), solo: false, mute: false };
 }
 function updateTrack(mixer, track, patch) {
     if (!Number.isInteger(track) || track < 0 || track >= mixer.tracks.length) {

@@ -21,11 +21,16 @@ export type Mixer = {
   readonly tracks: ReadonlyArray<TrackMix>
 }
 
-/** A mixer for `trackCount` tracks at normal volume, nothing soloed or muted. */
-export function createMixer(trackCount: number): Mixer {
+/**
+ * A mixer with one track per entry of `fileVolumes`, nothing soloed or muted. The master is at normal
+ * volume. Each track starts at the volume its file gives it (alphaTab's `playbackInfo.volume / 16`),
+ * because setting a track's volume replaces that value rather than scaling it: a default of 1 would
+ * overwrite the file's own balance between tracks.
+ */
+export function createMixer(fileVolumes: ReadonlyArray<number>): Mixer {
   return {
     master: 1,
-    tracks: Array.from({ length: trackCount }, defaultTrack),
+    tracks: fileVolumes.map((fileVolume) => defaultTrack(fileVolume)),
   }
 }
 
@@ -50,17 +55,17 @@ export function setMute(mixer: Mixer, track: number, mute: boolean): Mixer {
 }
 
 /**
- * Makes saved settings fit a score with `trackCount` tracks. Tracks past the
- * score's end are dropped, missing tracks get defaults, and volumes are
- * clamped. A saved mixer can come from an older revision of the score, so
- * its track count is not trusted.
+ * Makes saved settings fit a score whose tracks have the volumes `fileVolumes` (one entry per track).
+ * Tracks past the score's end are dropped, missing tracks get the file's volume as in `createMixer`,
+ * and volumes are clamped. A saved mixer can come from an older revision of the score, so its track
+ * count is not trusted.
  */
-export function fitMixer(saved: Mixer, trackCount: number): Mixer {
+export function fitMixer(saved: Mixer, fileVolumes: ReadonlyArray<number>): Mixer {
   return {
     master: clampVolume(saved.master),
-    tracks: Array.from({ length: trackCount }, (_, index) => {
+    tracks: fileVolumes.map((fileVolume, index) => {
       const track = saved.tracks[index]
-      if (!track) return defaultTrack()
+      if (!track) return defaultTrack(fileVolume)
       return { ...track, volume: clampVolume(track.volume) }
     }),
   }
@@ -72,8 +77,8 @@ export function clampVolume(volume: number): number {
   return Math.min(MAX_VOLUME, Math.max(MIN_VOLUME, volume))
 }
 
-function defaultTrack(): TrackMix {
-  return { volume: 1, solo: false, mute: false }
+function defaultTrack(fileVolume: number): TrackMix {
+  return { volume: clampVolume(fileVolume), solo: false, mute: false }
 }
 
 function updateTrack(mixer: Mixer, track: number, patch: Partial<TrackMix>): Mixer {
