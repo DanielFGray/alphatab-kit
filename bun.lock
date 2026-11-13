@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "alphatab-kit",
+      "name": "gigbag.js",
       "dependencies": {
         "chordsheetjs": "18.0.0",
         "diff-match-patch": "1.0.5",
