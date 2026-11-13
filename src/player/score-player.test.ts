@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { synth, type model } from "@coderline/alphatab"
+import { PlayerMode, synth, type model } from "@coderline/alphatab"
 import { selectionLabel } from "../charts/score-bars.ts"
 import { createMixer, setMute, setSolo, setTrackVolume } from "../charts/score-mixer.ts"
 import type { Notation } from "../charts/score-notation.ts"
@@ -107,6 +107,11 @@ function fakeApi() {
       moves.push("clear-highlight")
       api.playbackRangeHighlightChanged.emit({})
     },
+    // What a replaced player does: it starts at the top with no range, and says nothing.
+    forget() {
+      range = null
+      api.timePosition = 0
+    },
     scoreLoaded: new ScoreLoadedEmitter(),
     renderStarted: new Emitter<boolean>(),
     postRenderFinished: new Emitter(),
@@ -131,7 +136,7 @@ function fakeApi() {
     changeTrackMute: (tracks: PlayerTrack[], mute: boolean) =>
       void calls.push(`mute:${tracks.map((track) => track.index).join()}:${mute}`),
     renderTracks: (tracks: PlayerTrack[]) => void calls.push(`render:${tracks.map((track) => track.index).join()}`),
-    settings: { display: { scale: 1, stretchForce: 1 } },
+    settings: { display: { scale: 1, stretchForce: 1 }, player: { playerMode: PlayerMode.EnabledExternalMedia } },
     updateSettings: () => void calls.push("updateSettings"),
     render: () => void calls.push("render"),
     load(data: unknown) {
@@ -198,19 +203,6 @@ test("load fails when alphaTab cannot read the data, and an error event fails th
   expect(player.getState()).toMatchObject({ status: "loading", error: null })
   api.error.emit({ message: "bad header" })
   expect(player.getState()).toMatchObject({ status: "error", error: "bad header" })
-})
-
-test("play and playPause wait for the player to be ready", () => {
-  const { api, calls } = fakeApi()
-  const player = createScorePlayer(api)
-  player.play()
-  player.playPause()
-  expect(calls).toEqual([])
-  api.playerReady.emit()
-  player.play()
-  player.playPause()
-  player.pause()
-  expect(calls).toEqual(["play", "playPause", "pause"])
 })
 
 test("playing follows the player state event", () => {
@@ -347,15 +339,18 @@ test("subscribers hear a change once, an equal update is silent, and dispose rem
   const player = createScorePlayer(api)
   let heard = 0
   const unsubscribe = player.subscribe(() => heard++)
-  api.playerReady.emit()
-  api.playerReady.emit()
+  player.play()
   expect(heard).toBe(1)
+  api.playerReady.emit()
+  api.playerReady.emit()
+  expect(heard).toBe(2)
   const before = player.getState()
   api.postRenderFinished.emit()
   expect(player.getState()).not.toBe(before)
+  expect(heard).toBe(3)
   unsubscribe()
-  api.playerReady.emit()
-  expect(heard).toBe(2)
+  api.postRenderFinished.emit()
+  api.renderStarted.emit(false)
   player.dispose()
   expect(handlerCount(api)).toBe(0)
 })
@@ -428,6 +423,8 @@ test("a saved mixer is fitted on load, master is applied at once, and tracks wai
   expect(player.getState().mixer).toEqual({ ...saved, tracks: saved.tracks.slice(0, 3) })
   expect(api.masterVolume).toBe(0.4)
   expect(calls).toEqual([])
+  player.play()
+  calls.length = 0
   api.playerReady.emit()
   expect(calls).toEqual([
     "volume:0:0.3",
@@ -439,6 +436,7 @@ test("a saved mixer is fitted on load, master is applied at once, and tracks wai
     "volume:2:1",
     "solo:2:false",
     "mute:2:true",
+    "play",
   ])
   expect(heard).toEqual([])
 })
@@ -632,6 +630,7 @@ function keyed(tick = 0, options = {}) {
   const fake = fakeApi()
   const player = createScorePlayer(fake.api, options)
   fake.api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  player.play()
   fake.api.playerReady.emit()
   fake.api.tickPosition = tick
   fake.moves.length = 0
@@ -749,7 +748,7 @@ test("a drag by the mouse in between starts the next Shift move from the cursor"
   expect(moves[0]).toBe("highlight:400-500")
 })
 
-test("Space plays or pauses once the player is ready, and a repeat is ignored but still handled", () => {
+test("Space plays or pauses, loads the sound on the first press, and a repeat is ignored but still handled", () => {
   const { calls, player } = keyed(0)
   expect(player.handleKey(SPACE)).toBe(true)
   expect(calls).toEqual(["playPause"])
@@ -759,7 +758,8 @@ test("Space plays or pauses once the player is ready, and a repeat is ignored bu
   const waiting = createScorePlayer(early.api)
   early.api.scoreLoaded.emit({ tempo: 120 })
   expect(waiting.handleKey(SPACE)).toBe(true)
-  expect(early.calls).toEqual([])
+  expect(early.calls).toEqual(["updateSettings"])
+  expect(waiting.getState().sound).toBe("loading")
 })
 
 test("Ctrl+Space plays from the first beat and drops the selection", () => {
@@ -953,4 +953,136 @@ test("the practice callback is read when it is called, and none set means no rep
   time = 5000
   api.playerStateChanged.emit({ state: synth.PlayerState.Paused })
   expect(calls).toEqual(["late:3"])
+})
+
+/** The first play switches the API to the synthesizer; the sound font arrives with `playerReady`. */
+const loadedSound = () => {
+  const fake = fakeApi()
+  const player = createScorePlayer(fake.api)
+  fake.api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  return { ...fake, player }
+}
+
+test("a loaded score makes no mode change, and a playerReady from external-media mode is ignored", () => {
+  const { api, calls, player } = loadedSound()
+  expect(api.settings.player.playerMode).toBe(PlayerMode.EnabledExternalMedia)
+  api.playerReady.emit()
+  expect(player.getState().sound).toBe("off")
+  expect(calls).toEqual([])
+})
+
+test("the first play switches the mode once and plays at playerReady; sound goes off, loading, ready", () => {
+  const { api, calls, player } = loadedSound()
+  const seen = [player.getState().sound]
+  player.subscribe(() => seen.push(player.getState().sound))
+  player.play()
+  expect(api.settings.player.playerMode).toBe(PlayerMode.EnabledSynthesizer)
+  expect(calls).toEqual(["updateSettings"])
+  player.play()
+  expect(calls).toEqual(["updateSettings"])
+  api.playerReady.emit()
+  expect(player.getState().sound).toBe("ready")
+  expect(seen).toEqual(["off", "loading", "ready"])
+  expect(calls.at(-1)).toBe("play")
+  expect(calls.filter((call) => call === "play")).toHaveLength(1)
+  player.play()
+  player.playPause()
+  expect(calls.slice(-2)).toEqual(["play", "playPause"])
+  expect(calls.filter((call) => call === "updateSettings")).toHaveLength(1)
+})
+
+test("playPause on a silent player loads the sound and plays; a second press while loading cancels the play", () => {
+  const { api, calls, player } = loadedSound()
+  player.playPause()
+  expect(player.getState().sound).toBe("loading")
+  player.playPause()
+  api.playerReady.emit()
+  expect(player.getState().sound).toBe("ready")
+  expect(calls).not.toContain("play")
+  player.playPause()
+  expect(calls.at(-1)).toBe("playPause")
+  const again = loadedSound()
+  again.player.playPause()
+  again.api.playerReady.emit()
+  expect(again.calls.at(-1)).toBe("play")
+})
+
+test("stop, seek and the settings actions before the first play load no sound", () => {
+  const { api, calls, player } = loadedSound()
+  player.seek(500)
+  player.stop()
+  player.pause()
+  player.setSpeed(0.5)
+  player.setLoop(true)
+  player.setMetronome(true)
+  player.setCountIn(true)
+  player.setMasterVolume(0.5)
+  player.setTrackVolume(0, 0.5)
+  player.setSolo(1, true)
+  expect(api.settings.player.playerMode).toBe(PlayerMode.EnabledExternalMedia)
+  expect(player.getState().sound).toBe("off")
+  expect(calls).not.toContain("updateSettings")
+})
+
+test("stop, pause and load while the sound loads drop the pending play but the sound still arrives", () => {
+  for (const drop of [
+    (player: ReturnType<typeof loadedSound>["player"]) => player.stop(),
+    (player: ReturnType<typeof loadedSound>["player"]) => player.pause(),
+    (player: ReturnType<typeof loadedSound>["player"]) => player.load({ url: "/b.gp" }),
+  ]) {
+    const { api, calls, player } = loadedSound()
+    player.play()
+    drop(player)
+    api.playerReady.emit()
+    expect(player.getState().sound).toBe("ready")
+    expect(calls).not.toContain("play")
+  }
+})
+
+test("dispose while the sound loads drops the pending play", () => {
+  const { api, calls, player } = loadedSound()
+  player.play()
+  player.dispose()
+  api.playerReady.emit()
+  expect(calls).not.toContain("play")
+})
+
+test("mixer settings reach the new player before the pending play starts", () => {
+  const { api, calls, player } = loadedSound()
+  player.setSolo(1, true)
+  player.play()
+  calls.length = 0
+  api.playerReady.emit()
+  expect(calls).toEqual([
+    "volume:0:1",
+    "solo:0:false",
+    "mute:0:false",
+    "volume:1:1",
+    "solo:1:true",
+    "mute:1:false",
+    "volume:2:0.5",
+    "solo:2:false",
+    "mute:2:false",
+    "play",
+  ])
+})
+
+test("the position and the selection set before the first play survive the new player", () => {
+  const { api, player } = loadedSound()
+  api.timePosition = 1200
+  api.playbackRange = { startTick: 100, endTick: 300 }
+  player.play()
+  api.forget()
+  api.playerReady.emit()
+  expect(api.playbackRange).toEqual({ startTick: 100, endTick: 300 })
+  expect(api.timePosition).toBe(1200)
+})
+
+test("a seek while the sound loads is not overwritten when the sound arrives", () => {
+  const { api, player } = loadedSound()
+  api.timePosition = 1200
+  player.play()
+  player.seek(300)
+  api.playerReady.emit()
+  expect(api.timePosition).toBe(300)
 })

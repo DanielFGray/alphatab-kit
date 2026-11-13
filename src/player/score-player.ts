@@ -1,4 +1,4 @@
-import { synth, type model } from "@coderline/alphatab"
+import { PlayerMode, synth, type model } from "@coderline/alphatab"
 import { beatSpanOf, type BeatSpan } from "../charts/score-bars.ts"
 import { barEdgeBeat, beatIndexAt, collectBeats, type NavBeat } from "../charts/score-navigation.ts"
 import {
@@ -42,8 +42,11 @@ export interface ScorePlayerState {
   readonly error: string | null
   /** True once the score is drawn; false again while a redraw runs. Beat positions are valid only when true. */
   readonly rendered: boolean
-  /** True once the synthesizer and sound font can play. Play does nothing before it. */
-  readonly playerReady: boolean
+  /**
+   * The synthesizer and its sound font (about 1 MB) load on the first play, not with the score. `off` until then,
+   * `loading` while they download, `ready` once they can play. The cursor, seek and selection work in every state.
+   */
+  readonly sound: "off" | "loading" | "ready"
   readonly playing: boolean
   readonly positionMs: number
   readonly endMs: number
@@ -222,8 +225,8 @@ export interface PlayerApi {
   changeTrackVolume(tracks: PlayerTrack[], volume: number): void
   changeTrackSolo(tracks: PlayerTrack[], solo: boolean): void
   changeTrackMute(tracks: PlayerTrack[], mute: boolean): void
-  readonly settings: { readonly display: DisplaySettings }
-  /** Applies `settings` to the renderer; it does not draw. */
+  readonly settings: { readonly display: DisplaySettings; readonly player: { playerMode: PlayerMode } }
+  /** Applies `settings` to the renderer and, when `playerMode` changed, replaces the player; it does not draw. */
   updateSettings(): void
   /** Draws the loaded score again with the current settings. */
   render(): void
@@ -265,6 +268,12 @@ export interface PlayerApi {
  * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
  * only once a score is loaded: before that the settings are set and the first draw uses them.
  *
+ * Sound loads on demand. The API starts in external-media mode (cursor, seek and selection, no audio), and the first
+ * `play` or `playPause` switches it to the synthesizer and plays once `playerReady` says the sound font is loaded.
+ * The switch replaces alphaTab's player, which keeps the volumes, speed and loop but not the position or the range,
+ * so those are put back at `playerReady`. alphaTab also fires `playerReady` in external-media mode, once the MIDI is
+ * loaded; that event has no synthesizer behind it and is ignored while `sound` is `off`.
+ *
  * Practice time counts from alphaTab's Playing state, and is measured with `now` (milliseconds; a test passes a
  * fake clock). It is reported at position events, so no timer runs here.
  *
@@ -280,7 +289,7 @@ export function createScorePlayer(
     status: "loading",
     error: null,
     rendered: false,
-    playerReady: false,
+    sound: "off",
     playing: false,
     positionMs: 0,
     endMs: 0,
@@ -338,6 +347,31 @@ export function createScorePlayer(
   const settlePractice = () => {
     clock = tick(clock, now())
     reportPractice(0)
+  }
+
+  // Play was asked for while the sound loads: it starts at `playerReady`.
+  let wantsPlay = false
+  // Where the old player stood when the synthesizer replaced it; null once the user moved on, or when none is owed.
+  let resume: { range: PlayerApi["playbackRange"]; ms: number } | null = null
+
+  const loadSound = () => {
+    resume = { range: api.playbackRange, ms: api.timePosition }
+    api.settings.player.playerMode = PlayerMode.EnabledSynthesizer
+    update({ sound: "loading" })
+    api.updateSettings()
+  }
+
+  const startPlay = () => {
+    if (state.sound === "ready") return void api.play()
+    wantsPlay = true
+    if (state.sound === "off") loadSound()
+  }
+
+  // While the sound loads a second press cancels the pending play, as it would stop a playing one.
+  const playPause = () => {
+    if (state.sound === "ready") return api.playPause()
+    if (wantsPlay) wantsPlay = false
+    else startPlay()
   }
 
   const fail = (message: string) => update({ status: "error", error: message })
@@ -461,6 +495,7 @@ export function createScorePlayer(
     } else {
       dropSelection()
     }
+    resume = null
     api.tickPosition = target.startTick
     api.scrollToCursor()
     update({ positionMs: api.timePosition })
@@ -469,12 +504,13 @@ export function createScorePlayer(
   const playFromStart = () => {
     dropSelection()
     api.stop()
+    resume = null
     const first = collectBeats(api.tracks)[0]
     if (first) api.tickPosition = first.startTick
     else api.timePosition = 0
     api.scrollToCursor()
     update({ positionMs: api.timePosition })
-    if (state.playerReady) api.play()
+    startPlay()
   }
 
   // alphaTab keeps these volumes and the speed until its player exists, so they can be set now.
@@ -524,8 +560,18 @@ export function createScorePlayer(
     api.postRenderFinished.on(() => update({ rendered: true })),
     // alphaTab's own handler runs first and sets each track to its file's volume; ours then wins.
     api.playerReady.on(() => {
+      if (state.sound === "off") return
       applyTrackMixer(state.mixer)
-      update({ playerReady: true })
+      const owed = resume
+      resume = null
+      if (owed) {
+        if (owed.range) api.playbackRange = owed.range
+        api.timePosition = owed.ms
+      }
+      update({ sound: "ready" })
+      if (!wantsPlay) return
+      wantsPlay = false
+      api.play()
     }),
     api.playerStateChanged.on((event) => {
       const playing = event.state === synth.PlayerState.Playing
@@ -553,6 +599,7 @@ export function createScorePlayer(
     }),
     api.playbackRangeChanged.on((event) => {
       // A mouse drag is no key press: the next Shift move starts from the cursor, not from an old anchor.
+      resume = null
       if (!extendingByKey) anchor = null
       finishedRounds = 0
       // A range with no highlight is alphaTab's own reset, not a selection.
@@ -568,6 +615,8 @@ export function createScorePlayer(
       return () => listeners.delete(listener)
     },
     load: (source) => {
+      wantsPlay = false
+      resume = null
       stopPractice()
       update({ status: "loading", error: null, rendered: false })
       dropSelection()
@@ -575,21 +624,21 @@ export function createScorePlayer(
       const accepted = api.load("bytes" in source ? source.bytes : source.url)
       if (!accepted) fail("The score viewer cannot read this file.")
     },
-    play: () => {
-      if (state.playerReady) api.play()
-    },
+    play: startPlay,
     pause: () => {
+      wantsPlay = false
       api.pause()
     },
-    playPause: () => {
-      if (state.playerReady) api.playPause()
-    },
+    playPause,
     stop: () => {
+      wantsPlay = false
+      resume = null
       api.stop()
       finishedRounds = 0
       update({ positionMs: 0 })
     },
     seek: (ms) => {
+      resume = null
       const clamped = Math.max(0, state.endMs > 0 ? Math.min(ms, state.endMs) : ms)
       api.timePosition = clamped
       finishedRounds = 0
@@ -660,7 +709,7 @@ export function createScorePlayer(
       if (key.code === "Space") {
         if (key.repeat) return true
         if (key.ctrlKey) playFromStart()
-        else if (state.playerReady) api.playPause()
+        else playPause()
         return true
       }
       const here = cursor()
@@ -671,6 +720,7 @@ export function createScorePlayer(
       return true
     },
     dispose: () => {
+      wantsPlay = false
       stopPractice()
       for (const unsubscribe of unsubscribers) unsubscribe()
       listeners.clear()

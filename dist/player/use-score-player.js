@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AlphaTabApi, Settings } from "@coderline/alphatab";
+import { AlphaTabApi, PlayerMode, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
 import { createMixer } from "../charts/score-mixer.js";
 import { createScorePlayer, DEFAULT_TRAINER, STANDARD_ONLY, } from "./score-player.js";
@@ -27,7 +27,8 @@ export function useScorePlayer(options) {
         settings.core.engine = "svg";
         settings.core.scriptFile = urls.scriptFile;
         settings.core.fontDirectory = urls.fontDirectory;
-        settings.player.enablePlayer = true;
+        // No audio yet: the cursor and selection work, and the first play switches to the synthesizer.
+        settings.player.playerMode = PlayerMode.EnabledExternalMedia;
         settings.player.enableCursor = true;
         settings.player.soundFont = urls.soundFont;
         configure?.(settings);
@@ -81,7 +82,7 @@ const INITIAL_STATE = {
     status: "loading",
     error: null,
     rendered: false,
-    playerReady: false,
+    sound: "off",
     playing: false,
     positionMs: 0,
     endMs: 0,

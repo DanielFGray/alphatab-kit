@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react"
-import { AlphaTabApi, Settings } from "@coderline/alphatab"
+import { AlphaTabApi, PlayerMode, Settings } from "@coderline/alphatab"
 import { alphaTabAssetUrls } from "../index.ts"
 import { createMixer } from "../charts/score-mixer.ts"
 import {
@@ -54,7 +54,8 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     settings.core.engine = "svg"
     settings.core.scriptFile = urls.scriptFile
     settings.core.fontDirectory = urls.fontDirectory
-    settings.player.enablePlayer = true
+    // No audio yet: the cursor and selection work, and the first play switches to the synthesizer.
+    settings.player.playerMode = PlayerMode.EnabledExternalMedia
     settings.player.enableCursor = true
     settings.player.soundFont = urls.soundFont
     configure?.(settings)
@@ -111,7 +112,7 @@ const INITIAL_STATE: ScorePlayerState = {
   status: "loading",
   error: null,
   rendered: false,
-  playerReady: false,
+  sound: "off",
   playing: false,
   positionMs: 0,
   endMs: 0,

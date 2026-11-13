@@ -1,4 +1,4 @@
-import { type model } from "@coderline/alphatab";
+import { PlayerMode, type model } from "@coderline/alphatab";
 import { type BeatSpan } from "../charts/score-bars.ts";
 import { type Mixer } from "../charts/score-mixer.ts";
 import { type Notation } from "../charts/score-notation.ts";
@@ -31,8 +31,11 @@ export interface ScorePlayerState {
     readonly error: string | null;
     /** True once the score is drawn; false again while a redraw runs. Beat positions are valid only when true. */
     readonly rendered: boolean;
-    /** True once the synthesizer and sound font can play. Play does nothing before it. */
-    readonly playerReady: boolean;
+    /**
+     * The synthesizer and its sound font (about 1 MB) load on the first play, not with the score. `off` until then,
+     * `loading` while they download, `ready` once they can play. The cursor, seek and selection work in every state.
+     */
+    readonly sound: "off" | "loading" | "ready";
     readonly playing: boolean;
     readonly positionMs: number;
     readonly endMs: number;
@@ -221,8 +224,11 @@ export interface PlayerApi {
     changeTrackMute(tracks: PlayerTrack[], mute: boolean): void;
     readonly settings: {
         readonly display: DisplaySettings;
+        readonly player: {
+            playerMode: PlayerMode;
+        };
     };
-    /** Applies `settings` to the renderer; it does not draw. */
+    /** Applies `settings` to the renderer and, when `playerMode` changed, replaces the player; it does not draw. */
     updateSettings(): void;
     /** Draws the loaded score again with the current settings. */
     render(): void;
@@ -267,6 +273,12 @@ export interface PlayerApi {
  * The scale is the user's zoom on the base for the host's width (`displayForWidth`); until the host's width is known
  * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
  * only once a score is loaded: before that the settings are set and the first draw uses them.
+ *
+ * Sound loads on demand. The API starts in external-media mode (cursor, seek and selection, no audio), and the first
+ * `play` or `playPause` switches it to the synthesizer and plays once `playerReady` says the sound font is loaded.
+ * The switch replaces alphaTab's player, which keeps the volumes, speed and loop but not the position or the range,
+ * so those are put back at `playerReady`. alphaTab also fires `playerReady` in external-media mode, once the MIDI is
+ * loaded; that event has no synthesizer behind it and is ignored while `sound` is `off`.
  *
  * Practice time counts from alphaTab's Playing state, and is measured with `now` (milliseconds; a test passes a
  * fake clock). It is reported at position events, so no timer runs here.
