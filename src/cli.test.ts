@@ -7,7 +7,7 @@ import { syncPatch } from "./cli.ts"
 const kitPatches = path.join(import.meta.dir, "..", "patches")
 
 async function app(pkg: object, files: Record<string, string> = {}) {
-  const dir = await mkdtemp(path.join(tmpdir(), "alphatab-kit-"))
+  const dir = await mkdtemp(path.join(tmpdir(), "gigbag-"))
   await writeFile(path.join(dir, "package.json"), JSON.stringify(pkg))
   for (const [name, text] of Object.entries(files)) {
     await mkdir(path.dirname(path.join(dir, name)), { recursive: true })

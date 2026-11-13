@@ -1,5 +1,5 @@
 {
-  "name": "alphatab-kit",
+  "name": "gigbag.js",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -67,7 +67,7 @@
     "patches"
   ],
   "bin": {
-    "alphatab-kit": "./dist/bin.js"
+    "gigbag": "./dist/bin.js"
   },
   "peerDependenciesMeta": {
     "effect": {

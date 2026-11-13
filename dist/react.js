@@ -15,7 +15,7 @@ import { staticScoreCss, staticScoreHtml } from "./static.js";
 export function StaticScoreFrame({ score, playerReady, fontDirectory = `${ALPHATAB_BASE}font/`, children, }) {
     preload(`${fontDirectory}Bravura.woff2`, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
     const html = useMemo(() => staticScoreHtml(score), [score]);
-    return (_jsxs("div", { className: "at-frame", "data-player-ready": playerReady ? "" : undefined, children: [_jsx("style", { href: `alphatab-kit/static-score${fontDirectory}`, precedence: "alphatab-kit", children: `${staticScoreCss(fontDirectory)}\n${FRAME_CSS}` }), _jsx("div", { className: "at-frame-static", dangerouslySetInnerHTML: { __html: html } }), _jsx("div", { className: "at-frame-player", children: children })] }));
+    return (_jsxs("div", { className: "at-frame", "data-player-ready": playerReady ? "" : undefined, children: [_jsx("style", { href: `gigbag.js/static-score${fontDirectory}`, precedence: "gigbag.js", children: `${staticScoreCss(fontDirectory)}\n${FRAME_CSS}` }), _jsx("div", { className: "at-frame-static", dangerouslySetInnerHTML: { __html: html } }), _jsx("div", { className: "at-frame-player", children: children })] }));
 }
 // visibility, not display: alphaTab skips drawing into an element with no width.
 const FRAME_CSS = `.at-frame{position:relative}

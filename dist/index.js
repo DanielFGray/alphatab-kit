@@ -3,7 +3,7 @@ export const ALPHATAB_PACKAGE = "@coderline/alphatab";
 export const ALPHATAB_BASE = "/alphatab/";
 /**
  * The URLs to pass to alphaTab settings (`core.scriptFile`, `core.fontDirectory`,
- * `player.soundFont`), for files the `alphatab-kit/vite` plugin serves.
+ * `player.soundFont`), for files the `gigbag.js/vite` plugin serves.
  * `scriptFile` must be absolute: alphaTab loads it inside a worker started from
  * a blob URL, where a relative URL has no base to resolve against.
  * Call it in the browser only; it reads `location`.

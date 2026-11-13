@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { ALPHATAB_PACKAGE } from "./index.ts"
 
 /**
- * `alphatab-kit patch [--check]`, run from an app's folder.
+ * `gigbag patch [--check]`, run from an app's folder.
  *
  * bun applies a dependency patch during install, before the kit itself is
  * installed, and a container build only sees files inside the app. So each app
@@ -16,11 +16,11 @@ import { ALPHATAB_PACKAGE } from "./index.ts"
 export async function main(args: ReadonlyArray<string>): Promise<number> {
   const [command, ...flags] = args
   if (command !== "patch") {
-    console.error("usage: alphatab-kit patch [--check]")
+    console.error("usage: gigbag patch [--check]")
     return 2
   }
   const problems = await syncPatch(process.cwd(), { check: flags.includes("--check") })
-  for (const problem of problems) console.error(`alphatab-kit: ${problem}`)
+  for (const problem of problems) console.error(`gigbag: ${problem}`)
   return problems.length > 0 ? 1 : 0
 }
 
@@ -66,7 +66,7 @@ export async function syncPatch(appDir: string, { check }: { check: boolean }): 
 async function kitPatch(): Promise<{ version: string; source: string }> {
   const dir = fileURLToPath(new URL("../patches/", import.meta.url))
   const names = (await readdir(dir)).filter((n) => /^alphatab-.+\.patch$/.test(n))
-  if (names.length !== 1) throw new Error(`alphatab-kit: expected one patch in ${dir}, found ${names.length}`)
+  if (names.length !== 1) throw new Error(`gigbag: expected one patch in ${dir}, found ${names.length}`)
   const name = names[0]!
   return { version: name.slice("alphatab-".length, -".patch".length), source: path.join(dir, name) }
 }

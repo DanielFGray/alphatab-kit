@@ -6,7 +6,7 @@ import path from "node:path"
 // Apps install the kit from git without building it, so the committed dist/ must match src/.
 test("dist/ is built from the current src/", async () => {
   const root = path.join(import.meta.dir, "..")
-  const out = await mkdtemp(path.join(tmpdir(), "alphatab-kit-dist-"))
+  const out = await mkdtemp(path.join(tmpdir(), "gigbag-dist-"))
   try {
     const build = Bun.spawnSync(["bunx", "tsc", "-p", "tsconfig.build.json", "--outDir", out], { cwd: root })
     expect(build.exitCode).toBe(0)

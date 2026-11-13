@@ -38,7 +38,7 @@ export function StaticScoreFrame({
   const html = useMemo(() => staticScoreHtml(score), [score])
   return (
     <div className="at-frame" data-player-ready={playerReady ? "" : undefined}>
-      <style href={`alphatab-kit/static-score${fontDirectory}`} precedence="alphatab-kit">
+      <style href={`gigbag.js/static-score${fontDirectory}`} precedence="gigbag.js">
         {`${staticScoreCss(fontDirectory)}\n${FRAME_CSS}`}
       </style>
       <div className="at-frame-static" dangerouslySetInnerHTML={{ __html: html }} />

@@ -36,7 +36,7 @@ export function alphaTabAssets(): Plugin {
   const hashedDir = () => (workerDir ??= workerFilesHash(dist!).then((hash) => `alphatab/${hash}`))
 
   return {
-    name: "alphatab-kit:assets",
+    name: "gigbag:assets",
     config: () => ({ optimizeDeps: { exclude: [ALPHATAB_PACKAGE] } }),
     configResolved(config) {
       isBuild = config.command === "build"
@@ -87,7 +87,7 @@ export function rewriteWorkerUrls(code: string, dir: string): string {
   let out = code
   for (const name of ["alphaTab.worker.mjs", "alphaTab.worklet.mjs"]) {
     const relative = `"./${name}", import.meta.url`
-    if (!out.includes(relative)) throw new Error(`alphatab-kit: ${ENTRY_MODULE} no longer loads ${relative}`)
+    if (!out.includes(relative)) throw new Error(`gigbag: ${ENTRY_MODULE} no longer loads ${relative}`)
     out = out.replaceAll(relative, `"${dir}${name}", import.meta.url`)
   }
   return out

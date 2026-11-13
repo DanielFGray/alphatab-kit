@@ -1,5 +1,5 @@
 /**
- * `alphatab-kit patch [--check]`, run from an app's folder.
+ * `gigbag patch [--check]`, run from an app's folder.
  *
  * bun applies a dependency patch during install, before the kit itself is
  * installed, and a container build only sees files inside the app. So each app
