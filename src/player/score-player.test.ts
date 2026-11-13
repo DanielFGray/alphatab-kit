@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { synth } from "@coderline/alphatab"
+import { synth, type model } from "@coderline/alphatab"
+import { selectionLabel } from "../charts/score-bars.ts"
 import { createMixer, setMute, setSolo, setTrackVolume } from "../charts/score-mixer.ts"
 import type { Notation } from "../charts/score-notation.ts"
 import { createScorePlayer, type DisplaySettings,
@@ -42,9 +43,70 @@ const track = (index: number, name: string, volume = 16, program = 25, isPercuss
 
 const SCORE_TRACKS = [track(0, "Guitar", 16), track(1, "  "), track(2, "Bass", 8)]
 
+/** A drawn track of bars of beats, shaped like alphaTab's model: each number is a beat's start tick. */
+function beatTrack(bars: ReadonlyArray<ReadonlyArray<number>>): model.Track {
+  const staff = { bars: [] as unknown[] }
+  bars.forEach((ticks, index) => {
+    const bar = { masterBar: { index }, voices: [] as unknown[] }
+    const voice = { bar, beats: [] as unknown[] }
+    voice.beats = ticks.map((tick, beat) => ({ absolutePlaybackStart: tick, index: beat, voice }))
+    bar.voices.push(voice)
+    staff.bars.push(bar)
+  })
+  return { staves: [staff] } as unknown as model.Track
+}
+
+/** Three bars: one of three beats, one of two, one of one. A beat's tick is its number times 100. */
+const BARS = [[0, 100, 200], [300, 400], [500]]
+
 function fakeApi() {
   const calls: string[] = []
+  // What the selection and cursor calls did, apart from `calls`, which older tests compare whole.
+  const moves: string[] = []
+  const drawn = beatTrack(BARS)
+  const beats = drawn.staves[0]!.bars.flatMap((bar) => bar.voices[0]!.beats)
+  const beatOf = (tick: number) => beats.find((beat) => beat.absolutePlaybackStart === tick)!
+  let range: { startTick: number; endTick: number } | null = null
+  let marked: { startBeat: model.Beat; endBeat: model.Beat } | null = null
   const api = {
+    tracks: [drawn] as ReadonlyArray<model.Track>,
+    tickPosition: 0,
+    scrollToCursor: () => void moves.push("scroll"),
+    playbackRangeChanged: new Emitter<{ playbackRange: unknown }>(),
+    playbackRangeHighlightChanged: new Emitter<{ startBeat?: model.Beat; endBeat?: model.Beat }>(),
+    get playbackRange() {
+      return range
+    },
+    // alphaTab fires the range event on every set, a null one included.
+    set playbackRange(value: { startTick: number; endTick: number } | null) {
+      range = value
+      moves.push(`range:${value ? `${value.startTick}-${value.endTick}` : "none"}`)
+      api.playbackRangeChanged.emit({ playbackRange: value })
+    },
+    highlightPlaybackRange(startBeat: model.Beat, endBeat: model.Beat) {
+      marked = { startBeat, endBeat }
+      moves.push(`highlight:${startBeat.absolutePlaybackStart}-${endBeat.absolutePlaybackStart}`)
+      // alphaTab reports the beats in playback order, and nothing for a one-beat highlight.
+      const [first, last] = [startBeat, endBeat].sort((a, b) => a.absolutePlaybackStart - b.absolutePlaybackStart)
+      api.playbackRangeHighlightChanged.emit(startBeat === endBeat ? {} : { startBeat: first!, endBeat: last! })
+    },
+    // Like alphaTab, the highlight's beats become the ticks of the range, in order.
+    applyPlaybackRangeFromHighlight() {
+      if (!marked) return
+      const ordered = [marked.startBeat, marked.endBeat].sort(
+        (a, b) => a.absolutePlaybackStart - b.absolutePlaybackStart,
+      )
+      const [first, last] = ordered
+      const after = beats[beats.indexOf(beatOf(last!.absolutePlaybackStart)) + 1]
+      range = { startTick: first!.absolutePlaybackStart, endTick: after?.absolutePlaybackStart ?? 600 }
+      moves.push(`apply:${range.startTick}-${range.endTick}`)
+      api.playbackRangeChanged.emit({ playbackRange: range })
+    },
+    clearPlaybackRangeHighlight() {
+      marked = null
+      moves.push("clear-highlight")
+      api.playbackRangeHighlightChanged.emit({})
+    },
     scoreLoaded: new ScoreLoadedEmitter(),
     renderStarted: new Emitter<boolean>(),
     postRenderFinished: new Emitter(),
@@ -82,7 +144,7 @@ function fakeApi() {
     playPause: () => void calls.push("playPause"),
     stop: () => void calls.push("stop"),
   }
-  return { api: api satisfies PlayerApi, calls }
+  return { api: api satisfies PlayerApi, calls, moves, beats }
 }
 
 const handlerCount = (api: ReturnType<typeof fakeApi>["api"]) =>
@@ -96,6 +158,8 @@ const handlerCount = (api: ReturnType<typeof fakeApi>["api"]) =>
     api.playerFinished,
     api.resize,
     api.error,
+    api.playbackRangeChanged,
+    api.playbackRangeHighlightChanged,
   ].reduce(
     (sum, emitter) => sum + emitter.handlers.size,
     0,
@@ -561,4 +625,225 @@ test("a toggle applies to every staff, draws, and reports; a staff without strin
   expect(saved).toEqual([{ standard: false, tab: true }])
   player.setNotation("tab")
   expect(player.getState().notation).toEqual({ standard: true, tab: false })
+})
+
+/** A ready player on the three-bar score with the cursor on `tick`, and the call logs cleared. */
+function keyed(tick = 0, options = {}) {
+  const fake = fakeApi()
+  const player = createScorePlayer(fake.api, options)
+  fake.api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  fake.api.playerReady.emit()
+  fake.api.tickPosition = tick
+  fake.moves.length = 0
+  fake.calls.length = 0
+  return { ...fake, player }
+}
+
+type Mods = { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean; repeat?: boolean }
+const press = (key: string, mods: Mods = {}) => ({
+  key,
+  code: key === " " ? "Space" : key,
+  ctrlKey: mods.ctrl ?? false,
+  shiftKey: mods.shift ?? false,
+  altKey: mods.alt ?? false,
+  metaKey: mods.meta ?? false,
+  repeat: mods.repeat ?? false,
+})
+const SPACE = press(" ")
+
+test("each navigation key moves the cursor to its beat and says it handled the key", () => {
+  const cases: Array<[from: number, key: ReturnType<typeof press>, to: number]> = [
+    [100, press("ArrowRight"), 200],
+    [200, press("ArrowRight"), 300],
+    [100, press("ArrowLeft"), 0],
+    [300, press("ArrowLeft"), 200],
+    [200, press("Home"), 0],
+    [400, press("Home"), 300],
+    [0, press("End"), 200],
+    [300, press("End"), 400],
+    [400, press("Home", { ctrl: true }), 0],
+    [100, press("End", { ctrl: true }), 500],
+    [100, press("ArrowRight", { ctrl: true }), 300],
+    [400, press("ArrowRight", { ctrl: true }), 500],
+    [400, press("ArrowLeft", { ctrl: true }), 0],
+    [500, press("ArrowLeft", { ctrl: true }), 300],
+    [150, press("ArrowRight"), 200],
+  ]
+  for (const [from, key, to] of cases) {
+    const { api, player } = keyed(from)
+    expect(player.handleKey(key)).toBe(true)
+    expect([key.key, key.ctrlKey, api.tickPosition]).toEqual([key.key, key.ctrlKey, to])
+  }
+})
+
+test("a move at the edge of the score stays put; a bar jump with no bar to go to is not handled", () => {
+  const first = keyed(0)
+  expect(first.player.handleKey(press("ArrowLeft"))).toBe(true)
+  expect(first.api.tickPosition).toBe(0)
+  expect(first.player.handleKey(press("ArrowLeft", { ctrl: true }))).toBe(false)
+  const last = keyed(500)
+  expect(last.player.handleKey(press("ArrowRight"))).toBe(true)
+  expect(last.api.tickPosition).toBe(500)
+  expect(last.player.handleKey(press("ArrowRight", { ctrl: true }))).toBe(false)
+  expect(last.player.handleKey(press("a"))).toBe(false)
+})
+
+test("a move scrolls to the cursor and shows its time while paused", () => {
+  const { api, moves, player } = keyed(0)
+  api.timePosition = 1234
+  player.handleKey(press("ArrowRight"))
+  expect(moves).toContain("scroll")
+  expect(player.getState().positionMs).toBe(1234)
+})
+
+test("Shift with a move extends the selection from the beat it began on", () => {
+  const { api, moves, player } = keyed(100)
+  expect(player.handleKey(press("ArrowRight", { shift: true }))).toBe(true)
+  expect(moves).toEqual(["highlight:100-200", "apply:100-300", "scroll"])
+  expect(api.tickPosition).toBe(200)
+  expect(player.getState().selection).toEqual({
+    first: { bar: 0, beat: 1, beatCount: 3 },
+    last: { bar: 0, beat: 2, beatCount: 3 },
+  })
+  expect(selectionLabel(player.getState().selection!)).toBe("Bar 1, beats 2–3")
+  moves.length = 0
+  player.handleKey(press("ArrowRight", { shift: true }))
+  expect(moves[0]).toBe("highlight:100-300")
+  expect(api.tickPosition).toBe(300)
+  player.handleKey(press("ArrowLeft", { shift: true }))
+  player.handleKey(press("ArrowLeft", { shift: true }))
+  player.handleKey(press("ArrowLeft", { shift: true }))
+  expect(moves.at(-3)).toBe("highlight:100-0")
+  expect(player.getState().selection!.first).toEqual({ bar: 0, beat: 0, beatCount: 3 })
+})
+
+test("a selection of whole bars reads as bars", () => {
+  const { player } = keyed(0)
+  player.handleKey(press("End", { shift: true }))
+  expect(selectionLabel(player.getState().selection!)).toBe("Bar 1")
+  player.handleKey(press("ArrowRight", { shift: true, ctrl: true }))
+  player.handleKey(press("End", { shift: true, ctrl: true }))
+  expect(selectionLabel(player.getState().selection!)).toBe("Bars 1–3")
+})
+
+test("a plain move drops the selection and its anchor", () => {
+  const { api, moves, player } = keyed(100)
+  player.handleKey(press("ArrowRight", { shift: true }))
+  moves.length = 0
+  player.handleKey(press("ArrowRight"))
+  expect(moves).toEqual(["range:none", "clear-highlight", "scroll"])
+  expect(player.getState().selection).toBeNull()
+  expect(api.playbackRange).toBeNull()
+  moves.length = 0
+  player.handleKey(press("ArrowRight", { shift: true }))
+  expect(moves[0]).toBe("highlight:300-400")
+})
+
+test("a drag by the mouse in between starts the next Shift move from the cursor", () => {
+  const { api, moves, player } = keyed(0)
+  player.handleKey(press("ArrowRight", { shift: true }))
+  api.tickPosition = 400
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 300, endTick: 500 } })
+  moves.length = 0
+  player.handleKey(press("ArrowRight", { shift: true }))
+  expect(moves[0]).toBe("highlight:400-500")
+})
+
+test("Space plays or pauses once the player is ready, and a repeat is ignored but still handled", () => {
+  const { calls, player } = keyed(0)
+  expect(player.handleKey(SPACE)).toBe(true)
+  expect(calls).toEqual(["playPause"])
+  expect(player.handleKey(press(" ", { repeat: true }))).toBe(true)
+  expect(calls).toEqual(["playPause"])
+  const early = fakeApi()
+  const waiting = createScorePlayer(early.api)
+  early.api.scoreLoaded.emit({ tempo: 120 })
+  expect(waiting.handleKey(SPACE)).toBe(true)
+  expect(early.calls).toEqual([])
+})
+
+test("Ctrl+Space plays from the first beat and drops the selection", () => {
+  const { api, calls, player } = keyed(300)
+  player.handleKey(press("ArrowRight", { shift: true }))
+  calls.length = 0
+  expect(player.handleKey(press(" ", { ctrl: true }))).toBe(true)
+  expect(calls).toEqual(["stop", "play"])
+  expect(api.tickPosition).toBe(0)
+  expect(api.playbackRange).toBeNull()
+  expect(player.getState().selection).toBeNull()
+  expect(player.handleKey(press(" ", { ctrl: true, repeat: true }))).toBe(true)
+  expect(calls).toEqual(["stop", "play"])
+})
+
+test("Alt and Meta keys are not handled", () => {
+  const { api, calls, player } = keyed(100)
+  for (const mods of [{ alt: true }, { meta: true }]) {
+    expect(player.handleKey(press("ArrowRight", mods))).toBe(false)
+    expect(player.handleKey(press(" ", mods))).toBe(false)
+  }
+  expect(api.tickPosition).toBe(100)
+  expect(calls).toEqual([])
+})
+
+test("no key does anything until a score is loaded, or after a failed load", () => {
+  const { api, calls, moves, player } = (() => {
+    const fake = fakeApi()
+    return { ...fake, player: createScorePlayer(fake.api) }
+  })()
+  for (const key of [SPACE, press("ArrowRight"), press("Home", { ctrl: true }), press(" ", { ctrl: true })]) {
+    expect(player.handleKey(key)).toBe(false)
+  }
+  api.error.emit({ message: "bad" })
+  expect(player.handleKey(SPACE)).toBe(false)
+  expect([calls, moves]).toEqual([[], []])
+})
+
+test("a range event with its highlight sets the selection, and one without clears it", () => {
+  const { api, beats, player } = keyed(0)
+  api.playbackRangeHighlightChanged.emit({ startBeat: beats[3]!, endBeat: beats[4]! })
+  expect(player.getState().selection).toBeNull()
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 300, endTick: 500 } })
+  expect(selectionLabel(player.getState().selection!)).toBe("Bar 2")
+  api.playbackRangeChanged.emit({ playbackRange: null })
+  expect(player.getState().selection).toBeNull()
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 300, endTick: 500 } })
+  api.playbackRangeHighlightChanged.emit({})
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 0, endTick: 600 } })
+  expect(player.getState().selection).toBeNull()
+})
+
+test("clearSelection drops the range, the highlight and the selection", () => {
+  const { api, moves, player } = keyed(0)
+  player.handleKey(press("ArrowRight", { shift: true }))
+  moves.length = 0
+  player.clearSelection()
+  expect(moves).toEqual(["range:none", "clear-highlight"])
+  expect(api.playbackRange).toBeNull()
+  expect(player.getState().selection).toBeNull()
+})
+
+test("a selection change restarts the trainer's loop count", () => {
+  const { api, beats, player } = keyed(0, { loop: true, loopCount: 2, stepMode: "percent", stepValue: 10 })
+  api.playerFinished.emit()
+  api.playbackRangeHighlightChanged.emit({ startBeat: beats[0]!, endBeat: beats[2]! })
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 0, endTick: 300 } })
+  api.playerFinished.emit()
+  expect(player.getState().speed).toBe(1)
+  api.playerFinished.emit()
+  expect(player.getState().speed).toBe(1.1)
+})
+
+test("a new score or track drops the selection", () => {
+  const { api, player } = keyed(0)
+  player.handleKey(press("End", { shift: true }))
+  expect(player.getState().selection).not.toBeNull()
+  player.setTrack(1)
+  expect(player.getState().selection).toBeNull()
+  expect(api.playbackRange).toBeNull()
+  player.handleKey(press("End", { shift: true }))
+  player.load({ url: "/next.gp" })
+  expect(player.getState().selection).toBeNull()
+  player.handleKey(press("End", { shift: true }))
+  api.scoreLoaded.emit({ tempo: 120 })
+  expect(player.getState().selection).toBeNull()
 })

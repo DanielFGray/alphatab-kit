@@ -12,6 +12,7 @@ import {
   type ScoreSource,
   STANDARD_ONLY,
 } from "./score-player.ts"
+import { targetUsesKey } from "./keyboard.ts"
 
 export interface UseScorePlayerOptions extends ScorePlayerOptions {
   readonly source: ScoreSource
@@ -77,7 +78,18 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     const created = createScorePlayer(api, live)
     setPlayer(created)
     created.load(current)
+    // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
+    // where the app's controls live too, so a shortcut works with focus on any of them unless that control
+    // uses the key itself (targetUsesKey).
+    if (!element.hasAttribute("tabindex")) element.tabIndex = 0
+    const keys = element.parentElement ?? element
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || targetUsesKey(event.target, event.code)) return
+      if (created.handleKey(event)) event.preventDefault()
+    }
+    keys.addEventListener("keydown", onKeyDown, true)
     return () => {
+      keys.removeEventListener("keydown", onKeyDown, true)
       created.dispose()
       api.destroy()
       setPlayer(null)
@@ -110,6 +122,7 @@ const INITIAL_STATE: ScorePlayerState = {
   mixer: createMixer([]),
   zoom: 1,
   notation: STANDARD_ONLY,
+  selection: null,
 }
 
 const subscribeNothing = () => () => {}
@@ -137,4 +150,6 @@ const INERT_ACTIONS: ScorePlayerActions = {
   setMute: noop,
   setZoom: noop,
   setNotation: noop,
+  clearSelection: noop,
+  handleKey: () => false,
 }

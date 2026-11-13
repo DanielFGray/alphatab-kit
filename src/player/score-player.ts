@@ -1,4 +1,6 @@
-import { synth } from "@coderline/alphatab"
+import { synth, type model } from "@coderline/alphatab"
+import { beatSpanOf, type BeatSpan } from "../charts/score-bars.ts"
+import { barEdgeBeat, beatIndexAt, collectBeats, type NavBeat } from "../charts/score-navigation.ts"
 import {
   createMixer,
   fitMixer,
@@ -13,6 +15,7 @@ import { defaultNotation, staffNotation, toggleNotation, type Notation } from ".
 import { clampZoom } from "../charts/score-zoom.ts"
 import { trackOptions, type TrackOption } from "../charts/score-tracks.ts"
 import { clampSpeed, nextSpeed, type StepMode } from "../charts/speed-trainer.ts"
+import type { KeyPress } from "./keyboard.ts"
 
 /** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
 export type ScoreSource = { readonly bytes: Uint8Array } | { readonly url: string } | { readonly tex: string }
@@ -60,6 +63,8 @@ export interface ScorePlayerState {
   readonly zoom: number
   /** What every track's staves show. It resets to the drawn track's default when a score loads or `setTrack` runs. */
   readonly notation: Notation
+  /** The beats the playback range covers, or null for the whole score. The app words it with `selectionLabel`. */
+  readonly selection: BeatSpan | null
 }
 
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
@@ -90,6 +95,15 @@ export interface ScorePlayerActions {
   setZoom: (zoom: number) => void
   /** Flips one notation for every track and redraws. At least one stays on. Calls `onNotationChange`. */
   setNotation: (which: keyof Notation) => void
+  /** Plays the whole score again: drops the playback range and the selection. */
+  clearSelection: () => void
+  /**
+   * Handles one key press and returns true when it was a score shortcut, so the caller can `preventDefault`.
+   * Space plays or pauses (Ctrl: from the start); the arrows move one beat (Ctrl: one bar); Home and End go to
+   * the edge of the bar (Ctrl: of the score); Shift with a move extends the selection from the beat it began on.
+   * Alt, Meta and every other key are not handled, and nothing is handled before a score is loaded.
+   */
+  handleKey: (key: KeyPress) => boolean
 }
 
 /** A score player: a state snapshot, a subscription to its changes, and the actions. */
@@ -209,6 +223,23 @@ export interface PlayerApi {
   render(): void
   /** Draws only these tracks. The sound is unchanged: alphaTab makes the MIDI from the whole score. */
   renderTracks(tracks: PlayerTrack[]): void
+  /** The tracks drawn now: the beats the keyboard moves over. */
+  readonly tracks: ReadonlyArray<model.Track>
+  /** The ticks the player plays; null for the whole score. Setting it fires `playbackRangeChanged`. */
+  playbackRange: { readonly startTick: number; readonly endTick: number } | null
+  tickPosition: number
+  /** Marks a selection without playing it; `applyPlaybackRangeFromHighlight` then makes it the range. */
+  highlightPlaybackRange(startBeat: model.Beat, endBeat: model.Beat): void
+  applyPlaybackRangeFromHighlight(): void
+  clearPlaybackRangeHighlight(): void
+  scrollToCursor(): void
+  /** Fires after a drag or `applyPlaybackRangeFromHighlight`, once the highlight event has told which beats. */
+  readonly playbackRangeChanged: PlayerEventOf<{ readonly playbackRange: unknown }>
+  /** The beats of the marked selection; both are missing when it is cleared. */
+  readonly playbackRangeHighlightChanged: PlayerEventOf<{
+    readonly startBeat?: model.Beat
+    readonly endBeat?: model.Beat
+  }>
 }
 
 /**
@@ -249,6 +280,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     mixer: options.mixer ?? createMixer([]),
     zoom: clampZoom(options.zoom ?? 1),
     notation: options.notation ?? STANDARD_ONLY,
+    selection: null,
     trainer: {
       loop: options.loop ?? DEFAULT_TRAINER.loop,
       loopCount: options.loopCount ?? DEFAULT_TRAINER.loopCount,
@@ -263,6 +295,12 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
   let finishedRounds = 0
   // The loaded score's tracks, as alphaTab needs them to draw one or change its mixer.
   let scoreTracks: ReadonlyArray<PlayerTrack> = []
+  // The beats of alphaTab's last highlight event: the range event that follows it names only ticks.
+  let highlighted: { start: model.Beat; end: model.Beat } | null = null
+  // The beat a Shift move extends from. It lasts while the selection grows; any other change drops it.
+  let anchor: model.Beat | null = null
+  // True while a key press makes alphaTab fire range events, so the anchor survives its own selection.
+  let extendingByKey = false
 
   const update = (patch: Partial<ScorePlayerState>) => {
     const next = { ...state, ...patch }
@@ -338,6 +376,76 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     update({ track: index, notation })
   }
 
+  // Drops the playback range, the highlight and the selection: the whole score plays again.
+  const dropSelection = () => {
+    anchor = null
+    highlighted = null
+    finishedRounds = 0
+    api.playbackRange = null
+    api.clearPlaybackRangeHighlight()
+    update({ selection: null })
+  }
+
+  // The playable beats and the index of the one the cursor stands on; null while the score has none.
+  const cursor = (): { beats: NavBeat[]; index: number } | null => {
+    const beats = collectBeats(api.tracks)
+    const index = beatIndexAt(beats, api.tickPosition)
+    return index < 0 ? null : { beats, index }
+  }
+
+  // The first beat of the bar before or after the cursor's bar; null at the score's edge.
+  const neighbourBar = (beats: NavBeat[], index: number, direction: -1 | 1): NavBeat | null => {
+    const edge = barEdgeBeat(beats, index, direction === 1 ? "end" : "start")
+    const next = edge ? beats[beatIndexAt(beats, edge.startTick) + direction] : undefined
+    return next ? barEdgeBeat(beats, beatIndexAt(beats, next.startTick), "start") : null
+  }
+
+  // The beat a navigation key goes to; null for a key that does not move the cursor, or has nowhere to go.
+  const targetOf = (key: KeyPress, beats: NavBeat[], index: number): NavBeat | null => {
+    switch (key.key) {
+      case "ArrowLeft":
+        return key.ctrlKey ? neighbourBar(beats, index, -1) : (beats[Math.max(0, index - 1)] ?? null)
+      case "ArrowRight":
+        return key.ctrlKey ? neighbourBar(beats, index, 1) : (beats[Math.min(beats.length - 1, index + 1)] ?? null)
+      case "Home":
+        return key.ctrlKey ? (beats[0] ?? null) : barEdgeBeat(beats, index, "start")
+      case "End":
+        return key.ctrlKey ? (beats.at(-1) ?? null) : barEdgeBeat(beats, index, "end")
+      default:
+        return null
+    }
+  }
+
+  // Moves the cursor to `target`. With `extend` the selection grows from the anchor to it; else the selection drops.
+  const moveTo = (target: NavBeat, current: NavBeat, extend: boolean) => {
+    if (extend) {
+      const from = (anchor ??= current.beat)
+      extendingByKey = true
+      try {
+        api.highlightPlaybackRange(from, target.beat)
+        api.applyPlaybackRangeFromHighlight()
+      } finally {
+        extendingByKey = false
+      }
+    } else {
+      dropSelection()
+    }
+    api.tickPosition = target.startTick
+    api.scrollToCursor()
+    update({ positionMs: api.timePosition })
+  }
+
+  const playFromStart = () => {
+    dropSelection()
+    api.stop()
+    const first = collectBeats(api.tracks)[0]
+    if (first) api.tickPosition = first.startTick
+    else api.timePosition = 0
+    api.scrollToCursor()
+    update({ positionMs: api.timePosition })
+    if (state.playerReady) api.play()
+  }
+
   // alphaTab keeps these volumes and the speed until its player exists, so they can be set now.
   api.metronomeVolume = state.metronome ? 1 : 0
   api.countInVolume = state.countIn ? 1 : 0
@@ -358,6 +466,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     api.scoreLoaded.on((score) => {
       baseTempo = score.tempo > 0 ? score.tempo : null
       scoreTracks = score.tracks
+      dropSelection()
       const fileVolumes = scoreTracks.map((track) => track.playbackInfo.volume / 16)
       const mixer = options.mixer ? fitMixer(options.mixer, fileVolumes) : createMixer(fileVolumes)
       const wanted = options.defaultTrack ?? 0
@@ -397,6 +506,16 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
       const { speed, trainer } = state
       applySpeed(nextSpeed(speed, trainer.stepMode, trainer.stepValue, baseTempo))
     }),
+    api.playbackRangeHighlightChanged.on((event) => {
+      highlighted = event.startBeat && event.endBeat ? { start: event.startBeat, end: event.endBeat } : null
+    }),
+    api.playbackRangeChanged.on((event) => {
+      // A mouse drag is no key press: the next Shift move starts from the cursor, not from an old anchor.
+      if (!extendingByKey) anchor = null
+      finishedRounds = 0
+      // A range with no highlight is alphaTab's own reset, not a selection.
+      update({ selection: event.playbackRange && highlighted ? beatSpanOf(highlighted.start, highlighted.end) : null })
+    }),
     api.error.on((error) => fail(error.message)),
   ]
 
@@ -408,6 +527,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     },
     load: (source) => {
       update({ status: "loading", error: null, rendered: false })
+      dropSelection()
       if ("tex" in source) return api.tex(source.tex)
       const accepted = api.load("bytes" in source ? source.bytes : source.url)
       if (!accepted) fail("The score viewer cannot read this file.")
@@ -454,7 +574,7 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
     setStepValue: (value) => setTrainer({ stepValue: value }),
     setTrack: (index) => {
       if (index === state.track) return
-      finishedRounds = 0
+      dropSelection()
       drawTrack(index)
     },
     setMasterVolume: (volume) => {
@@ -489,6 +609,22 @@ export function createScorePlayer(api: PlayerApi, options: ScorePlayerOptions = 
       applyNotation(next)
       if (scoreTracks.length > 0) api.render()
       options.onNotationChange?.(next)
+    },
+    clearSelection: dropSelection,
+    handleKey: (key) => {
+      if (state.status !== "ready" || key.altKey || key.metaKey) return false
+      if (key.code === "Space") {
+        if (key.repeat) return true
+        if (key.ctrlKey) playFromStart()
+        else if (state.playerReady) api.playPause()
+        return true
+      }
+      const here = cursor()
+      const current = here?.beats[here.index]
+      const target = here && targetOf(key, here.beats, here.index)
+      if (!current || !target) return false
+      moveTo(target, current, key.shiftKey)
+      return true
     },
     dispose: () => {
       for (const unsubscribe of unsubscribers) unsubscribe()

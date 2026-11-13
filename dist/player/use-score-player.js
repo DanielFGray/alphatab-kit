@@ -3,6 +3,7 @@ import { AlphaTabApi, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
 import { createMixer } from "../charts/score-mixer.js";
 import { createScorePlayer, DEFAULT_TRAINER, STANDARD_ONLY, } from "./score-player.js";
+import { targetUsesKey } from "./keyboard.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
  * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
@@ -50,7 +51,21 @@ export function useScorePlayer(options) {
         const created = createScorePlayer(api, live);
         setPlayer(created);
         created.load(current);
+        // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
+        // where the app's controls live too, so a shortcut works with focus on any of them unless that control
+        // uses the key itself (targetUsesKey).
+        if (!element.hasAttribute("tabindex"))
+            element.tabIndex = 0;
+        const keys = element.parentElement ?? element;
+        const onKeyDown = (event) => {
+            if (event.defaultPrevented || targetUsesKey(event.target, event.code))
+                return;
+            if (created.handleKey(event))
+                event.preventDefault();
+        };
+        keys.addEventListener("keydown", onKeyDown, true);
         return () => {
+            keys.removeEventListener("keydown", onKeyDown, true);
             created.dispose();
             api.destroy();
             setPlayer(null);
@@ -77,6 +92,7 @@ const INITIAL_STATE = {
     mixer: createMixer([]),
     zoom: 1,
     notation: STANDARD_ONLY,
+    selection: null,
 };
 const subscribeNothing = () => () => { };
 const noop = () => { };
@@ -101,4 +117,6 @@ const INERT_ACTIONS = {
     setMute: noop,
     setZoom: noop,
     setNotation: noop,
+    clearSelection: noop,
+    handleKey: () => false,
 };

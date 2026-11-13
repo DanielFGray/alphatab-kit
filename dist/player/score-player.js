@@ -1,4 +1,6 @@
 import { synth } from "@coderline/alphatab";
+import { beatSpanOf } from "../charts/score-bars.js";
+import { barEdgeBeat, beatIndexAt, collectBeats } from "../charts/score-navigation.js";
 import { createMixer, fitMixer, setMaster, setMute, setSolo, setTrackVolume, } from "../charts/score-mixer.js";
 import { displayForWidth } from "../charts/score-layout.js";
 import { defaultNotation, staffNotation, toggleNotation } from "../charts/score-notation.js";
@@ -47,6 +49,7 @@ export function createScorePlayer(api, options = {}) {
         mixer: options.mixer ?? createMixer([]),
         zoom: clampZoom(options.zoom ?? 1),
         notation: options.notation ?? STANDARD_ONLY,
+        selection: null,
         trainer: {
             loop: options.loop ?? DEFAULT_TRAINER.loop,
             loopCount: options.loopCount ?? DEFAULT_TRAINER.loopCount,
@@ -61,6 +64,12 @@ export function createScorePlayer(api, options = {}) {
     let finishedRounds = 0;
     // The loaded score's tracks, as alphaTab needs them to draw one or change its mixer.
     let scoreTracks = [];
+    // The beats of alphaTab's last highlight event: the range event that follows it names only ticks.
+    let highlighted = null;
+    // The beat a Shift move extends from. It lasts while the selection grows; any other change drops it.
+    let anchor = null;
+    // True while a key press makes alphaTab fire range events, so the anchor survives its own selection.
+    let extendingByKey = false;
     const update = (patch) => {
         const next = { ...state, ...patch };
         if (Object.keys(patch).every((key) => state[key] === next[key]))
@@ -130,6 +139,75 @@ export function createScorePlayer(api, options = {}) {
         api.renderTracks([track]);
         update({ track: index, notation });
     };
+    // Drops the playback range, the highlight and the selection: the whole score plays again.
+    const dropSelection = () => {
+        anchor = null;
+        highlighted = null;
+        finishedRounds = 0;
+        api.playbackRange = null;
+        api.clearPlaybackRangeHighlight();
+        update({ selection: null });
+    };
+    // The playable beats and the index of the one the cursor stands on; null while the score has none.
+    const cursor = () => {
+        const beats = collectBeats(api.tracks);
+        const index = beatIndexAt(beats, api.tickPosition);
+        return index < 0 ? null : { beats, index };
+    };
+    // The first beat of the bar before or after the cursor's bar; null at the score's edge.
+    const neighbourBar = (beats, index, direction) => {
+        const edge = barEdgeBeat(beats, index, direction === 1 ? "end" : "start");
+        const next = edge ? beats[beatIndexAt(beats, edge.startTick) + direction] : undefined;
+        return next ? barEdgeBeat(beats, beatIndexAt(beats, next.startTick), "start") : null;
+    };
+    // The beat a navigation key goes to; null for a key that does not move the cursor, or has nowhere to go.
+    const targetOf = (key, beats, index) => {
+        switch (key.key) {
+            case "ArrowLeft":
+                return key.ctrlKey ? neighbourBar(beats, index, -1) : (beats[Math.max(0, index - 1)] ?? null);
+            case "ArrowRight":
+                return key.ctrlKey ? neighbourBar(beats, index, 1) : (beats[Math.min(beats.length - 1, index + 1)] ?? null);
+            case "Home":
+                return key.ctrlKey ? (beats[0] ?? null) : barEdgeBeat(beats, index, "start");
+            case "End":
+                return key.ctrlKey ? (beats.at(-1) ?? null) : barEdgeBeat(beats, index, "end");
+            default:
+                return null;
+        }
+    };
+    // Moves the cursor to `target`. With `extend` the selection grows from the anchor to it; else the selection drops.
+    const moveTo = (target, current, extend) => {
+        if (extend) {
+            const from = (anchor ??= current.beat);
+            extendingByKey = true;
+            try {
+                api.highlightPlaybackRange(from, target.beat);
+                api.applyPlaybackRangeFromHighlight();
+            }
+            finally {
+                extendingByKey = false;
+            }
+        }
+        else {
+            dropSelection();
+        }
+        api.tickPosition = target.startTick;
+        api.scrollToCursor();
+        update({ positionMs: api.timePosition });
+    };
+    const playFromStart = () => {
+        dropSelection();
+        api.stop();
+        const first = collectBeats(api.tracks)[0];
+        if (first)
+            api.tickPosition = first.startTick;
+        else
+            api.timePosition = 0;
+        api.scrollToCursor();
+        update({ positionMs: api.timePosition });
+        if (state.playerReady)
+            api.play();
+    };
     // alphaTab keeps these volumes and the speed until its player exists, so they can be set now.
     api.metronomeVolume = state.metronome ? 1 : 0;
     api.countInVolume = state.countIn ? 1 : 0;
@@ -152,6 +230,7 @@ export function createScorePlayer(api, options = {}) {
         api.scoreLoaded.on((score) => {
             baseTempo = score.tempo > 0 ? score.tempo : null;
             scoreTracks = score.tracks;
+            dropSelection();
             const fileVolumes = scoreTracks.map((track) => track.playbackInfo.volume / 16);
             const mixer = options.mixer ? fitMixer(options.mixer, fileVolumes) : createMixer(fileVolumes);
             const wanted = options.defaultTrack ?? 0;
@@ -194,6 +273,17 @@ export function createScorePlayer(api, options = {}) {
             const { speed, trainer } = state;
             applySpeed(nextSpeed(speed, trainer.stepMode, trainer.stepValue, baseTempo));
         }),
+        api.playbackRangeHighlightChanged.on((event) => {
+            highlighted = event.startBeat && event.endBeat ? { start: event.startBeat, end: event.endBeat } : null;
+        }),
+        api.playbackRangeChanged.on((event) => {
+            // A mouse drag is no key press: the next Shift move starts from the cursor, not from an old anchor.
+            if (!extendingByKey)
+                anchor = null;
+            finishedRounds = 0;
+            // A range with no highlight is alphaTab's own reset, not a selection.
+            update({ selection: event.playbackRange && highlighted ? beatSpanOf(highlighted.start, highlighted.end) : null });
+        }),
         api.error.on((error) => fail(error.message)),
     ];
     return {
@@ -204,6 +294,7 @@ export function createScorePlayer(api, options = {}) {
         },
         load: (source) => {
             update({ status: "loading", error: null, rendered: false });
+            dropSelection();
             if ("tex" in source)
                 return api.tex(source.tex);
             const accepted = api.load("bytes" in source ? source.bytes : source.url);
@@ -255,7 +346,7 @@ export function createScorePlayer(api, options = {}) {
         setTrack: (index) => {
             if (index === state.track)
                 return;
-            finishedRounds = 0;
+            dropSelection();
             drawTrack(index);
         },
         setMasterVolume: (volume) => {
@@ -292,6 +383,27 @@ export function createScorePlayer(api, options = {}) {
             if (scoreTracks.length > 0)
                 api.render();
             options.onNotationChange?.(next);
+        },
+        clearSelection: dropSelection,
+        handleKey: (key) => {
+            if (state.status !== "ready" || key.altKey || key.metaKey)
+                return false;
+            if (key.code === "Space") {
+                if (key.repeat)
+                    return true;
+                if (key.ctrlKey)
+                    playFromStart();
+                else if (state.playerReady)
+                    api.playPause();
+                return true;
+            }
+            const here = cursor();
+            const current = here?.beats[here.index];
+            const target = here && targetOf(key, here.beats, here.index);
+            if (!current || !target)
+                return false;
+            moveTo(target, current, key.shiftKey);
+            return true;
         },
         dispose: () => {
             for (const unsubscribe of unsubscribers)

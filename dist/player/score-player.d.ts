@@ -1,7 +1,10 @@
+import { type model } from "@coderline/alphatab";
+import { type BeatSpan } from "../charts/score-bars.ts";
 import { type Mixer } from "../charts/score-mixer.ts";
 import { type Notation } from "../charts/score-notation.ts";
 import { type TrackOption } from "../charts/score-tracks.ts";
 import { type StepMode } from "../charts/speed-trainer.ts";
+import type { KeyPress } from "./keyboard.ts";
 /** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
 export type ScoreSource = {
     readonly bytes: Uint8Array;
@@ -50,6 +53,8 @@ export interface ScorePlayerState {
     readonly zoom: number;
     /** What every track's staves show. It resets to the drawn track's default when a score loads or `setTrack` runs. */
     readonly notation: Notation;
+    /** The beats the playback range covers, or null for the whole score. The app words it with `selectionLabel`. */
+    readonly selection: BeatSpan | null;
 }
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
 export interface ScorePlayerActions {
@@ -79,6 +84,15 @@ export interface ScorePlayerActions {
     setZoom: (zoom: number) => void;
     /** Flips one notation for every track and redraws. At least one stays on. Calls `onNotationChange`. */
     setNotation: (which: keyof Notation) => void;
+    /** Plays the whole score again: drops the playback range and the selection. */
+    clearSelection: () => void;
+    /**
+     * Handles one key press and returns true when it was a score shortcut, so the caller can `preventDefault`.
+     * Space plays or pauses (Ctrl: from the start); the arrows move one beat (Ctrl: one bar); Home and End go to
+     * the edge of the bar (Ctrl: of the score); Shift with a move extends the selection from the beat it began on.
+     * Alt, Meta and every other key are not handled, and nothing is handled before a score is loaded.
+     */
+    handleKey: (key: KeyPress) => boolean;
 }
 /** A score player: a state snapshot, a subscription to its changes, and the actions. */
 export interface ScorePlayer extends ScorePlayerActions {
@@ -209,6 +223,28 @@ export interface PlayerApi {
     render(): void;
     /** Draws only these tracks. The sound is unchanged: alphaTab makes the MIDI from the whole score. */
     renderTracks(tracks: PlayerTrack[]): void;
+    /** The tracks drawn now: the beats the keyboard moves over. */
+    readonly tracks: ReadonlyArray<model.Track>;
+    /** The ticks the player plays; null for the whole score. Setting it fires `playbackRangeChanged`. */
+    playbackRange: {
+        readonly startTick: number;
+        readonly endTick: number;
+    } | null;
+    tickPosition: number;
+    /** Marks a selection without playing it; `applyPlaybackRangeFromHighlight` then makes it the range. */
+    highlightPlaybackRange(startBeat: model.Beat, endBeat: model.Beat): void;
+    applyPlaybackRangeFromHighlight(): void;
+    clearPlaybackRangeHighlight(): void;
+    scrollToCursor(): void;
+    /** Fires after a drag or `applyPlaybackRangeFromHighlight`, once the highlight event has told which beats. */
+    readonly playbackRangeChanged: PlayerEventOf<{
+        readonly playbackRange: unknown;
+    }>;
+    /** The beats of the marked selection; both are missing when it is cleared. */
+    readonly playbackRangeHighlightChanged: PlayerEventOf<{
+        readonly startBeat?: model.Beat;
+        readonly endBeat?: model.Beat;
+    }>;
 }
 /**
  * Drives `api`: it listens to alphaTab's events and keeps the state from them, and its actions call the API.
