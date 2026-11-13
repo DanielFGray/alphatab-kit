@@ -12,6 +12,8 @@ Shared alphaTab customizations for dfg.codes, dfg.rocks and setlist: Vite plugin
 
 The patch holds: lyric skipping past tied notes and the GP5 percussion fallback (from setlist), and pointer events plus tempo after a seek in the sequencer (from dfg.rocks). It fails on any other alphaTab version: port the hunks to the new `dist` (whitespace and quote style differ between releases) and rename the file.
 
+The kit applies the same patch to its own alphaTab (`patchedDependencies` in package.json): the chart tests read lyrics from scores and rely on the tied-note fix.
+
 # Learning more about Effect
 
 This repository uses the Effect Typescript library.
@@ -21,5 +23,3 @@ Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
 
 If you need to learn more about particular Effect apis and concepts that the
 guide doesn't cover, search through the source code in `node_modules/effect/src`.
-
-The kit applies the same patch to its own alphaTab (`patchedDependencies` in package.json): the chart tests read lyrics from scores and rely on the tied-note fix.
