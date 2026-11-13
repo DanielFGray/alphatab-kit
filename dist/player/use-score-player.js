@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlphaTabApi, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
-import { createScorePlayer, } from "./score-player.js";
+import { createScorePlayer, DEFAULT_TRAINER, } from "./score-player.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
  * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
@@ -19,7 +19,7 @@ export function useScorePlayer(options) {
         const element = host.current;
         if (!element)
             return;
-        const { configure, metronome, countIn, source: current } = latest.current;
+        const { configure, source: current, ...initial } = latest.current;
         const settings = new Settings();
         const urls = alphaTabAssetUrls();
         settings.core.engine = "svg";
@@ -30,7 +30,7 @@ export function useScorePlayer(options) {
         settings.player.soundFont = urls.soundFont;
         configure?.(settings);
         const api = new AlphaTabApi(element, settings);
-        const created = createScorePlayer(api, { metronome, countIn });
+        const created = createScorePlayer(api, initial);
         setPlayer(created);
         created.load(current);
         return () => {
@@ -52,6 +52,9 @@ const INITIAL_STATE = {
     endMs: 0,
     metronome: false,
     countIn: false,
+    speed: 1,
+    tempo: null,
+    trainer: DEFAULT_TRAINER,
 };
 const subscribeNothing = () => () => { };
 const noop = () => { };
@@ -64,4 +67,9 @@ const INERT_ACTIONS = {
     seek: noop,
     setMetronome: noop,
     setCountIn: noop,
+    setSpeed: noop,
+    setLoop: noop,
+    setLoopCount: noop,
+    setStepMode: noop,
+    setStepValue: noop,
 };

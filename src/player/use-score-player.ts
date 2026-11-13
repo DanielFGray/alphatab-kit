@@ -3,6 +3,7 @@ import { AlphaTabApi, Settings } from "@coderline/alphatab"
 import { alphaTabAssetUrls } from "../index.ts"
 import {
   createScorePlayer,
+  DEFAULT_TRAINER,
   type ScorePlayer,
   type ScorePlayerActions,
   type ScorePlayerOptions,
@@ -44,7 +45,7 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
   useEffect(() => {
     const element = host.current
     if (!element) return
-    const { configure, metronome, countIn, source: current } = latest.current
+    const { configure, source: current, ...initial } = latest.current
     const settings = new Settings()
     const urls = alphaTabAssetUrls()
     settings.core.engine = "svg"
@@ -55,7 +56,7 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     settings.player.soundFont = urls.soundFont
     configure?.(settings)
     const api = new AlphaTabApi(element, settings)
-    const created = createScorePlayer(api, { metronome, countIn })
+    const created = createScorePlayer(api, initial)
     setPlayer(created)
     created.load(current)
     return () => {
@@ -83,6 +84,9 @@ const INITIAL_STATE: ScorePlayerState = {
   endMs: 0,
   metronome: false,
   countIn: false,
+  speed: 1,
+  tempo: null,
+  trainer: DEFAULT_TRAINER,
 }
 
 const subscribeNothing = () => () => {}
@@ -98,4 +102,9 @@ const INERT_ACTIONS: ScorePlayerActions = {
   seek: noop,
   setMetronome: noop,
   setCountIn: noop,
+  setSpeed: noop,
+  setLoop: noop,
+  setLoopCount: noop,
+  setStepMode: noop,
+  setStepValue: noop,
 }
