@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { barsLabel, barsOfTicks, sameBars, selectedBars, ticksOfBars, type BarTicks } from "./score-bars.ts"
+import { barsLabel, barsOfTicks, beatSpanOf, sameBars, selectedBars, selectionLabel, ticksOfBars, type BarTicks, type BeatPlace } from "./score-bars.ts"
 
 const bars: Array<BarTicks> = [0, 1, 2, 3].map((i) => ({ start: i * 100, end: (i + 1) * 100 }))
 
@@ -50,5 +50,46 @@ describe("sameBars", () => {
     expect(sameBars({ first: 1, last: 2 }, { first: 1, last: 3 })).toBe(false)
     expect(sameBars(null, null)).toBe(true)
     expect(sameBars(null, { first: 0, last: 0 })).toBe(false)
+  })
+})
+
+/** A beat in a voice of `beatCount` beats, in bar `bar`, shaped as alphaTab's model is. */
+function beatAt(bar: number, index: number, beatCount: number) {
+  return { index, voice: { beats: Array.from({ length: beatCount }), bar: { masterBar: { index: bar } } } }
+}
+
+function place(bar: number, beat: number, beatCount = 4): BeatPlace {
+  return { bar, beat, beatCount }
+}
+
+describe("beatSpanOf", () => {
+  it("reads each beat's bar, beat index and voice beat count, counting from 0", () => {
+    expect(beatSpanOf(beatAt(2, 1, 4), beatAt(4, 3, 4))).toEqual({ first: place(2, 1), last: place(4, 3) })
+  })
+})
+
+describe("selectionLabel", () => {
+  it("writes a span of one whole bar as Bar N", () => {
+    expect(selectionLabel({ first: place(2, 0), last: place(2, 3) })).toBe("Bar 3")
+  })
+
+  it("writes whole bars across bars as Bars N–M", () => {
+    expect(selectionLabel({ first: place(2, 0), last: place(4, 3) })).toBe("Bars 3–5")
+  })
+
+  it("names one beat in a bar", () => {
+    expect(selectionLabel({ first: place(2, 1), last: place(2, 1) })).toBe("Bar 3, beat 2")
+  })
+
+  it("names a run of beats in a bar", () => {
+    expect(selectionLabel({ first: place(2, 0), last: place(2, 1) })).toBe("Bar 3, beats 1–2")
+  })
+
+  it("names the beats of a span across bars", () => {
+    expect(selectionLabel({ first: place(2, 1), last: place(4, 0) })).toBe("Bar 3 beat 2 – Bar 5 beat 1")
+  })
+
+  it("names the beats across bars when only the first bar is whole", () => {
+    expect(selectionLabel({ first: place(2, 0), last: place(4, 0) })).toBe("Bar 3 beat 1 – Bar 5 beat 1")
   })
 })

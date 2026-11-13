@@ -37,3 +37,35 @@ export declare function selectedBars(bars: ReadonlyArray<BarTicks>, playbackRang
 export declare function barsLabel(span: BarSpan): string;
 /** Whether two spans name the same bars. Two nulls are the same: no selection. */
 export declare function sameBars(a: BarSpan | null, b: BarSpan | null): boolean;
+/** A selected beat's place: its bar and its beat inside its voice, both counted from 0, and how many beats the voice holds. */
+export type BeatPlace = {
+    readonly bar: number;
+    readonly beat: number;
+    readonly beatCount: number;
+};
+/** A selection by beat: the first and the last beat it covers, both inclusive. */
+export type BeatSpan = {
+    readonly first: BeatPlace;
+    readonly last: BeatPlace;
+};
+/** The part of alphaTab's beat model a selection reads. */
+type BeatLike = {
+    readonly index: number;
+    readonly voice: {
+        readonly beats: ReadonlyArray<unknown>;
+        readonly bar: {
+            readonly masterBar: {
+                readonly index: number;
+            };
+        };
+    };
+};
+/** The span from a selection's first beat to its last. The beat count is what tells the last beat of a bar from a middle one. */
+export declare function beatSpanOf(startBeat: BeatLike, endBeat: BeatLike): BeatSpan;
+/**
+ * A beat span written for a reader, counting bars and beats from 1. A span
+ * that starts on a bar's first beat and ends on its last reads as bars ("Bar 3",
+ * "Bars 3–5"); any other span names its beats ("Bar 3, beats 1–2").
+ */
+export declare function selectionLabel(span: BeatSpan): string;
+export {};
