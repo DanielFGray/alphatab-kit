@@ -1,13 +1,3 @@
-/**
- * The bars a playback range covers: from the bar its start falls in through the
- * bar its end falls in. The end is exclusive, so a range that ends where a bar
- * begins does not take that bar.
- */
-export function barsOfTicks(bars, startTick, endTick) {
-    const first = Math.max(0, bars.findLastIndex((bar) => bar.start <= startTick));
-    const last = Math.max(first, bars.findLastIndex((bar) => bar.start < endTick));
-    return { first, last };
-}
 /** The playback range of a run of bars, from the first bar's start to the last bar's end. */
 export function ticksOfBars(bars, span) {
     return { startTick: bars[span.first].start, endTick: bars[span.last].end };
@@ -16,16 +6,21 @@ export function ticksOfBars(bars, span) {
 export function barTicksOf(masterBars) {
     return masterBars.map((bar) => ({ start: bar.start, end: bar.start + bar.calculateDuration() }));
 }
+/** The bars a beat selection touches: a selection that covers part of a bar counts that whole bar. */
+export function barsOfBeatSpan(span) {
+    return { first: span.first.bar, last: span.last.bar };
+}
 /**
- * The bars a drag selected, given the playback range alphaTab now holds. The
- * drawn bars are the range a view plays by default, so that range is no
- * selection, and neither is no range at all.
+ * The tempo in effect at the start of bar `index`: the nearest tempo marking at or before that bar, since a
+ * tempo change is stored on the bar that makes it. Null when no bar up to it has one.
  */
-export function selectedBars(bars, playbackRange, drawn) {
-    if (!playbackRange)
-        return null;
-    const span = barsOfTicks(bars, playbackRange.startTick, playbackRange.endTick);
-    return drawn && drawn.first === span.first && drawn.last === span.last ? null : span;
+export function tempoAtBar(bars, index) {
+    for (let i = Math.min(index, bars.length - 1); i >= 0; i--) {
+        const value = bars[i].tempoAutomations[0]?.value;
+        if (value !== undefined && value > 0)
+            return value;
+    }
+    return null;
 }
 /** A span written for a reader, which counts bars from 1: "Bar 3" or "Bars 3–4". */
 export function barsLabel(span) {
@@ -60,4 +55,11 @@ function barLabel(bar) {
 }
 function placeOf(beat) {
     return { bar: beat.voice.bar.masterBar.index, beat: beat.index, beatCount: beat.voice.beats.length };
+}
+/** Whether two selections name the same beats. Two nulls are the same: no selection. */
+export function sameBeats(a, b) {
+    return a === b || (a !== null && b !== null && samePlace(a.first, b.first) && samePlace(a.last, b.last));
+}
+function samePlace(a, b) {
+    return a.bar === b.bar && a.beat === b.beat && a.beatCount === b.beatCount;
 }

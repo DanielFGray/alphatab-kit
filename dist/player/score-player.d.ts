@@ -1,17 +1,23 @@
 import { PlayerMode, type model } from "@coderline/alphatab";
-import { type BeatSpan } from "../charts/score-bars.ts";
+import { type BarSpan, type BeatSpan } from "../charts/score-bars.ts";
 import { type Mixer } from "../charts/score-mixer.ts";
 import { type Notation } from "../charts/score-notation.ts";
 import { type TrackOption } from "../charts/score-tracks.ts";
 import { type StepMode } from "../charts/speed-trainer.ts";
 import type { KeyPress } from "./keyboard.ts";
-/** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
+/**
+ * Where a score comes from: file bytes, a URL alphaTab downloads, alphaTex source, or a score the app has parsed.
+ * The app keeps a parsed score it also reads itself, such as to list its tracks or to draw it in more than one view.
+ * The controller sets the staves' notation on it, so a score shared between views shows the same notation in each.
+ */
 export type ScoreSource = {
     readonly bytes: Uint8Array;
 } | {
     readonly url: string;
 } | {
     readonly tex: string;
+} | {
+    readonly score: model.Score;
 };
 /** The speed trainer's settings. Each finished loop of the passage counts; after `loopCount` counts the speed steps up. */
 export interface TrainerState {
@@ -43,7 +49,11 @@ export interface ScorePlayerState {
     readonly countIn: boolean;
     /** The playback speed: 1 is the score's own tempo. Always inside the range `clampSpeed` allows. */
     readonly speed: number;
-    /** The score's tempo at `speed`, rounded to a tenth; null when the score names none. */
+    /**
+     * The tempo where the passage starts, at `speed`, rounded to a tenth: the passage is the selection, else the
+     * drawn bars, else the whole score. The tempo is the nearest marking at or before that bar. Null when the score
+     * names none.
+     */
     readonly tempo: number | null;
     readonly trainer: TrainerState;
     /** The score's tracks; empty until a score loads. */
@@ -56,7 +66,10 @@ export interface ScorePlayerState {
     readonly zoom: number;
     /** What every track's staves show. It resets to the drawn track's default when a score loads or `setTrack` runs. */
     readonly notation: Notation;
-    /** The beats the playback range covers, or null for the whole score. The app words it with `selectionLabel`. */
+    /**
+     * The beats the user selected: by a drag, by keys, or by `selectBars`. Null when nothing is selected, and
+     * the playback range is then the drawn bars (`bars`), else the whole score. The app words it with `selectionLabel`.
+     */
     readonly selection: BeatSpan | null;
 }
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
@@ -87,8 +100,15 @@ export interface ScorePlayerActions {
     setZoom: (zoom: number) => void;
     /** Flips one notation for every track and redraws. At least one stays on. Calls `onNotationChange`. */
     setNotation: (which: keyof Notation) => void;
-    /** Plays the whole score again: drops the playback range and the selection. */
+    /** Drops the selection: the drawn bars (else the whole score) play again. */
     clearSelection: () => void;
+    /**
+     * Selects whole bars, counted from 0 with both ends inclusive, as a drag would, and makes them the playback range.
+     * Null clears the selection. Nothing happens before a score is loaded, for bars outside the drawn bars, or when the
+     * selection already touches exactly these bars (a drag inside one bar is not replaced by the whole bar).
+     * It does not call `onSelectionChange`: the app that sets a selection already knows it.
+     */
+    selectBars: (span: BarSpan | null) => void;
     /**
      * Handles one key press and returns true when it was a score shortcut, so the caller can `preventDefault`.
      * Space plays or pauses (Ctrl: from the start); the arrows move one beat (Ctrl: one bar); Home and End go to
@@ -105,6 +125,12 @@ export interface ScorePlayer extends ScorePlayerActions {
     subscribe: (listener: () => void) => () => void;
     /** Starts loading a score. Call it once, after the player is created, so no event is missed. */
     load: (source: ScoreSource) => void;
+    /**
+     * Changes which bars are drawn (null: all of them) and draws again; the score is not loaded again. The playback
+     * range and the tempo follow, and the selection is dropped. `useScorePlayer` calls this when its `bars` option
+     * changes.
+     */
+    setBars: (span: BarSpan | null) => void;
     /** Removes every handler the player put on the API. It does not destroy the API: its creator does. */
     dispose: () => void;
 }
@@ -120,6 +146,16 @@ export interface ScorePlayerOptions {
     readonly trackLabel?: (track: PlayerTrack, index: number) => string;
     /** The track drawn first. An index outside the score falls back to 0. */
     readonly defaultTrack?: number;
+    /**
+     * The bars drawn, counted from 0 with both ends inclusive; null or missing draws the whole score. Playback covers
+     * them when nothing is selected, and the tempo shown is the one where they start.
+     */
+    readonly bars?: BarSpan | null;
+    /**
+     * Called with the new selection when a drag or a key changes it, null when it ends. It is not called for a change
+     * the app made (`selectBars`, `clearSelection`, a new score, new bars or a track).
+     */
+    readonly onSelectionChange?: (selection: BeatSpan | null) => void;
     /** Saved settings, fitted to the score on load. Without them each track starts at its file's volume. */
     readonly mixer?: Mixer;
     /** Called with the new mixer after a user action changes it, not when the load fits it. */
@@ -142,6 +178,19 @@ export interface ScorePlayerOptions {
 export interface DisplaySettings {
     scale: number;
     stretchForce: number;
+    /** The first bar drawn, counted from 1. */
+    startBar: number;
+    /** How many bars are drawn from `startBar`; -1 draws to the end. */
+    barCount: number;
+}
+/** The part of an alphaTab `MasterBar` the controller reads. */
+export interface PlayerMasterBar {
+    /** The bar's first tick. */
+    readonly start: number;
+    calculateDuration(): number;
+    readonly tempoAutomations: ReadonlyArray<{
+        readonly value: number;
+    }>;
 }
 /** The part of an alphaTab `Staff` the controller sets. */
 export interface PlayerStaff {
@@ -179,6 +228,7 @@ export interface PlayerApi {
     readonly scoreLoaded: PlayerEventOf<{
         readonly tempo: number;
         readonly tracks: ReadonlyArray<PlayerTrack>;
+        readonly masterBars: ReadonlyArray<PlayerMasterBar>;
     }>;
     readonly renderStarted: PlayerEventOf<boolean>;
     readonly postRenderFinished: PlayerEvent;
@@ -208,6 +258,8 @@ export interface PlayerApi {
     /** Returns false when alphaTab cannot read the data type. */
     load(scoreData: unknown): boolean;
     tex(tex: string): void;
+    /** Draws a parsed score's first track, and fires `scoreLoaded` when the score is new to this API. */
+    renderScore(score: model.Score): void;
     play(): boolean;
     pause: () => void;
     playPause: () => void;
@@ -276,9 +328,14 @@ export interface PlayerApi {
  *
  * Sound loads on demand. The API starts in external-media mode (cursor, seek and selection, no audio), and the first
  * `play` or `playPause` switches it to the synthesizer and plays once `playerReady` says the sound font is loaded.
- * The switch replaces alphaTab's player, which keeps the volumes, speed and loop but not the position or the range,
- * so those are put back at `playerReady`. alphaTab also fires `playerReady` in external-media mode, once the MIDI is
- * loaded; that event has no synthesizer behind it and is ignored while `sound` is `off`.
+ * The switch replaces alphaTab's player, which keeps the volumes, speed and loop but not the position, so that is put
+ * back at `playerReady`. alphaTab also fires `playerReady` in external-media mode, once the MIDI is loaded; that
+ * event has no synthesizer behind it, so only the range is set again (below) while `sound` is `off`.
+ *
+ * The playback range is the selection's bars, else the drawn bars (`options.bars`), else none (the whole score).
+ * alphaTab loads each MIDI into a new sequencer that has no range, so this controller sets the range again at every
+ * `playerReady`. It sets the range and recognises the change event of each range it sets by the ticks, so only a
+ * drag or a key reaches `onSelectionChange`. Keys and the selection reach the drawn bars only.
  *
  * Practice time counts from alphaTab's Playing state, and is measured with `now` (milliseconds; a test passes a
  * fake clock). It is reported at position events, so no timer runs here.

@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import { PlayerMode, synth, type model } from "@coderline/alphatab"
-import { selectionLabel } from "../charts/score-bars.ts"
+import { beatSpanOf, selectionLabel } from "../charts/score-bars.ts"
 import { createMixer, setMute, setSolo, setTrackVolume } from "../charts/score-mixer.ts"
 import type { Notation } from "../charts/score-notation.ts"
-import { createScorePlayer, type DisplaySettings,
+import { createScorePlayer, type DisplaySettings, type PlayerMasterBar,
   type PlayerApi, type PlayerStaff, type PlayerTrack } from "./score-player.ts"
 
 class Emitter<T = void> {
@@ -18,9 +18,17 @@ class Emitter<T = void> {
 }
 
 /** `scoreLoaded` with a score that has no tracks unless a test gives some. */
-class ScoreLoadedEmitter extends Emitter<{ tempo: number; tracks: ReadonlyArray<PlayerTrack> }> {
-  override emit(value: { tempo: number; tracks?: ReadonlyArray<PlayerTrack> }) {
-    super.emit({ tracks: [], ...value })
+class ScoreLoadedEmitter extends Emitter<{
+  tempo: number
+  tracks: ReadonlyArray<PlayerTrack>
+  masterBars: ReadonlyArray<PlayerMasterBar>
+}> {
+  override emit(value: {
+    tempo: number
+    tracks?: ReadonlyArray<PlayerTrack>
+    masterBars?: ReadonlyArray<PlayerMasterBar>
+  }) {
+    super.emit({ tracks: [], masterBars: [], ...value })
   }
 }
 
@@ -72,6 +80,8 @@ function fakeApi() {
     tracks: [drawn] as ReadonlyArray<model.Track>,
     tickPosition: 0,
     scrollToCursor: () => void moves.push("scroll"),
+    // False for the synthesizer, whose range event comes back from its worker later; a test emits that event itself.
+    syncEvents: true,
     playbackRangeChanged: new Emitter<{ playbackRange: unknown }>(),
     playbackRangeHighlightChanged: new Emitter<{ startBeat?: model.Beat; endBeat?: model.Beat }>(),
     get playbackRange() {
@@ -81,7 +91,7 @@ function fakeApi() {
     set playbackRange(value: { startTick: number; endTick: number } | null) {
       range = value
       moves.push(`range:${value ? `${value.startTick}-${value.endTick}` : "none"}`)
-      api.playbackRangeChanged.emit({ playbackRange: value })
+      if (api.syncEvents) api.playbackRangeChanged.emit({ playbackRange: value })
     },
     highlightPlaybackRange(startBeat: model.Beat, endBeat: model.Beat) {
       marked = { startBeat, endBeat }
@@ -136,7 +146,10 @@ function fakeApi() {
     changeTrackMute: (tracks: PlayerTrack[], mute: boolean) =>
       void calls.push(`mute:${tracks.map((track) => track.index).join()}:${mute}`),
     renderTracks: (tracks: PlayerTrack[]) => void calls.push(`render:${tracks.map((track) => track.index).join()}`),
-    settings: { display: { scale: 1, stretchForce: 1 }, player: { playerMode: PlayerMode.EnabledExternalMedia } },
+    settings: {
+      display: { scale: 1, stretchForce: 1, startBar: 1, barCount: -1 },
+      player: { playerMode: PlayerMode.EnabledExternalMedia },
+    },
     updateSettings: () => void calls.push("updateSettings"),
     render: () => void calls.push("render"),
     load(data: unknown) {
@@ -144,6 +157,7 @@ function fakeApi() {
       return api.accepts
     },
     tex: (tex: string) => void calls.push(`tex:${tex}`),
+    renderScore: (score: model.Score) => void calls.push(`score:${(score as unknown as { name: string }).name}`),
     play: () => (calls.push("play"), true),
     pause: () => void calls.push("pause"),
     playPause: () => void calls.push("playPause"),
@@ -510,11 +524,11 @@ test("a resize event writes the band's scale and stretch into its settings and l
   createScorePlayer(api, { zoom: 2 })
   api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
   calls.length = 0
-  const settings = { display: { scale: 1, stretchForce: 1 } }
+  const settings = { display: { scale: 1, stretchForce: 1, startBar: 1, barCount: -1 } }
   api.resize.emit({ newWidth: 300, settings })
-  expect(settings.display).toEqual({ scale: 0.78 * 2, stretchForce: 0.82 })
+  expect(settings.display).toMatchObject({ scale: 0.78 * 2, stretchForce: 0.82 })
   api.resize.emit({ newWidth: 1200, settings })
-  expect(settings.display).toEqual({ scale: 2, stretchForce: 1 })
+  expect(settings.display).toMatchObject({ scale: 2, stretchForce: 1 })
   api.resize.emit({ newWidth: 300, settings: null })
   expect(calls).toEqual([])
 })
@@ -523,9 +537,9 @@ test("a zoom after a resize uses the stored width", () => {
   const { api, calls } = fakeApi()
   const player = createScorePlayer(api)
   api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
-  api.resize.emit({ newWidth: 400, settings: { display: { scale: 1, stretchForce: 1 } } })
+  api.resize.emit({ newWidth: 400, settings: { display: { scale: 1, stretchForce: 1, startBar: 1, barCount: -1 } } })
   player.setZoom(2)
-  expect(display(api)).toEqual({ scale: 0.84 * 2, stretchForce: 0.88 })
+  expect(display(api)).toMatchObject({ scale: 0.84 * 2, stretchForce: 0.88 })
   expect(calls).toEqual(["updateSettings", "render"])
 })
 
@@ -533,7 +547,7 @@ test("the first display comes from the container's width, and draws nothing", ()
   const { api, calls } = fakeApi()
   api.container.width = 500
   createScorePlayer(api, { zoom: 1.5 })
-  expect(display(api)).toEqual({ scale: 0.9 * 1.5, stretchForce: 0.94 })
+  expect(display(api)).toMatchObject({ scale: 0.9 * 1.5, stretchForce: 0.94 })
   expect(calls).toEqual(["updateSettings"])
 })
 
@@ -1071,11 +1085,24 @@ test("the position and the selection set before the first play survive the new p
   const { api, player } = loadedSound()
   api.timePosition = 1200
   api.playbackRange = { startTick: 100, endTick: 300 }
+  api.tickPosition = 200
   player.play()
   api.forget()
   api.playerReady.emit()
   expect(api.playbackRange).toEqual({ startTick: 100, endTick: 300 })
   expect(api.timePosition).toBe(1200)
+})
+
+test("a position outside the range is not restored: the player stays at the range's start", () => {
+  const { api, player } = loadedSound()
+  api.playbackRange = { startTick: 100, endTick: 300 }
+  api.timePosition = 5
+  api.tickPosition = 2
+  player.play()
+  api.forget()
+  api.timePosition = 0
+  api.playerReady.emit()
+  expect(api.timePosition).toBe(0)
 })
 
 test("a seek while the sound loads is not overwritten when the sound arrives", () => {
@@ -1085,4 +1112,252 @@ test("a seek while the sound loads is not overwritten when the sound arrives", (
   player.seek(300)
   api.playerReady.emit()
   expect(api.timePosition).toBe(300)
+})
+
+/** A master bar as alphaTab's model reports it, with a tempo marking when `tempo` is given. */
+const masterBar = (start: number, duration: number, tempo?: number): PlayerMasterBar => ({
+  start,
+  calculateDuration: () => duration,
+  tempoAutomations: tempo === undefined ? [] : [{ value: tempo }],
+})
+
+/** The bars of `BARS` with their ticks: 120 bpm from the first bar, 90 bpm from the third. */
+const MASTER_BARS = [masterBar(0, 300, 120), masterBar(300, 200), masterBar(500, 100, 90)]
+
+/** A player on the three-bar score with its bars known, and the call logs cleared. */
+function barred(options: Parameters<typeof createScorePlayer>[1] = {}) {
+  const fake = fakeApi()
+  const player = createScorePlayer(fake.api, options)
+  fake.api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS, masterBars: MASTER_BARS })
+  fake.moves.length = 0
+  fake.calls.length = 0
+  return { ...fake, player }
+}
+
+test("a parsed score is drawn by renderScore", () => {
+  const { api, calls } = fakeApi()
+  const player = createScorePlayer(api)
+  player.load({ score: { name: "parsed" } as unknown as model.Score })
+  expect(calls).toEqual(["score:parsed"])
+  expect(player.getState().status).toBe("loading")
+})
+
+test("bars are written into the display before the first draw, and the score plays only them", () => {
+  const { api, calls } = fakeApi()
+  const player = createScorePlayer(api, { bars: { first: 1, last: 2 } })
+  expect(api.settings.display).toMatchObject({ startBar: 2, barCount: 2 })
+  expect(calls).toEqual(["updateSettings"])
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS, masterBars: MASTER_BARS })
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 600 })
+  expect(player.getState().selection).toBeNull()
+})
+
+test("without bars the whole score is drawn and no range is set", () => {
+  const { api, calls } = fakeApi()
+  createScorePlayer(api)
+  expect(api.settings.display).toMatchObject({ startBar: 1, barCount: -1 })
+  expect(calls).toEqual([])
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS, masterBars: MASTER_BARS })
+  expect(api.playbackRange).toBeNull()
+})
+
+test("setBars draws the new bars again without a load, and the range, tempo and selection follow", () => {
+  const { api, calls, player } = barred({ bars: { first: 0, last: 0 } })
+  player.selectBars({ first: 0, last: 0 })
+  expect(player.getState().selection).not.toBeNull()
+  calls.length = 0
+  player.setBars({ first: 1, last: 2 })
+  expect(api.settings.display).toMatchObject({ startBar: 2, barCount: 2 })
+  expect(calls).toEqual(["updateSettings", "render:0"])
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 600 })
+  expect(player.getState()).toMatchObject({ selection: null, tempo: 120 })
+  calls.length = 0
+  player.setBars({ first: 1, last: 2 })
+  player.setBars(null)
+  expect(api.settings.display).toMatchObject({ startBar: 1, barCount: -1 })
+  expect(api.playbackRange).toBeNull()
+})
+
+test("setBars before a score loads changes the settings only", () => {
+  const { api, calls } = fakeApi()
+  const player = createScorePlayer(api)
+  player.setBars({ first: 2, last: 2 })
+  expect(api.settings.display).toMatchObject({ startBar: 3, barCount: 1 })
+  expect(calls).toEqual(["updateSettings"])
+})
+
+test("selectBars selects whole bars as a drag would, makes them the range, and keeps quiet", () => {
+  const changes: unknown[] = []
+  const { api, beats, moves, player } = barred({ onSelectionChange: (selection) => changes.push(selection) })
+  player.selectBars({ first: 0, last: 1 })
+  expect(api.playbackRange).toEqual({ startTick: 0, endTick: 500 })
+  expect(selectionLabel(player.getState().selection!)).toBe("Bars 1–2")
+  expect(player.getState().selection).toEqual(beatSpanOf(beats[0]!, beats[4]!))
+  expect(moves).toEqual(["range:0-500"])
+  // The same bars again change nothing, and a drag inside them is not replaced by whole bars.
+  moves.length = 0
+  player.selectBars({ first: 0, last: 1 })
+  expect(moves).toEqual([])
+  player.selectBars(null)
+  expect(player.getState().selection).toBeNull()
+  expect(api.playbackRange).toBeNull()
+  player.selectBars({ first: 2, last: 2 })
+  expect(selectionLabel(player.getState().selection!)).toBe("Bar 3")
+  expect(changes).toEqual([])
+})
+
+test("selectBars ignores bars the score does not have, bars outside the drawn bars, and a score not loaded", () => {
+  const fake = fakeApi()
+  const early = createScorePlayer(fake.api)
+  early.selectBars({ first: 0, last: 0 })
+  expect(fake.moves).toEqual([])
+  const { api, player } = barred({ bars: { first: 1, last: 1 } })
+  player.selectBars({ first: 0, last: 1 })
+  player.selectBars({ first: 1, last: 5 })
+  player.selectBars({ first: 2, last: 1 })
+  expect(player.getState().selection).toBeNull()
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 500 })
+})
+
+test("clearing a selection returns to the drawn bars, not the whole score", () => {
+  const { api, player } = barred({ bars: { first: 1, last: 2 } })
+  player.selectBars({ first: 2, last: 2 })
+  expect(api.playbackRange).toEqual({ startTick: 500, endTick: 600 })
+  player.clearSelection()
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 600 })
+  expect(player.getState().selection).toBeNull()
+})
+
+test("a drag or a key reports the selection to onSelectionChange; the player's own changes do not", () => {
+  const changes: Array<string | null> = []
+  const { api, beats, player } = barred({
+    onSelectionChange: (selection) => changes.push(selection && selectionLabel(selection)),
+  })
+  api.tickPosition = 0
+  api.playbackRangeHighlightChanged.emit({ startBeat: beats[3]!, endBeat: beats[4]! })
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 300, endTick: 450 } })
+  expect(changes).toEqual(["Bar 2"])
+  // The same event twice is one change.
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 300, endTick: 450 } })
+  expect(changes).toEqual(["Bar 2"])
+  player.selectBars({ first: 0, last: 0 })
+  player.clearSelection()
+  player.setBars({ first: 0, last: 1 })
+  player.setTrack(1)
+  player.load({ url: "/next.gp" })
+  api.scoreLoaded.emit({ tempo: 120, masterBars: MASTER_BARS })
+  expect(changes).toEqual(["Bar 2"])
+  // A drag that ends the selection is reported as null.
+  api.playbackRangeHighlightChanged.emit({ startBeat: beats[0]!, endBeat: beats[1]! })
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 0, endTick: 150 } })
+  api.playbackRangeChanged.emit({ playbackRange: null })
+  expect(changes).toEqual(["Bar 2", "Bar 1, beats 1–2", null])
+  api.tickPosition = 0
+  player.handleKey(press("ArrowRight", { shift: true }))
+  expect(changes.at(-1)).toBe("Bar 1, beats 1–2")
+})
+
+test("a range change that comes back late from the synthesizer is the player's own, whatever the selection", () => {
+  const changes: unknown[] = []
+  const { api, player } = barred({ onSelectionChange: (selection) => changes.push(selection) })
+  api.syncEvents = false
+  player.selectBars({ first: 0, last: 1 })
+  const selection = player.getState().selection
+  api.playbackRangeChanged.emit({ playbackRange: { startTick: 0, endTick: 500 } })
+  expect(player.getState().selection).toBe(selection)
+  player.clearSelection()
+  api.playbackRangeChanged.emit({ playbackRange: null })
+  expect(player.getState().selection).toBeNull()
+  expect(changes).toEqual([])
+})
+
+test("the tempo is the one where the passage starts: the selection, else the drawn bars, else the score", () => {
+  const { player } = barred()
+  expect(player.getState().tempo).toBe(120)
+  player.selectBars({ first: 2, last: 2 })
+  expect(player.getState().tempo).toBe(90)
+  player.setSpeed(0.5)
+  expect(player.getState().tempo).toBe(45)
+  player.selectBars({ first: 1, last: 2 })
+  expect(player.getState().tempo).toBe(60)
+  player.clearSelection()
+  expect(player.getState().tempo).toBe(60)
+  const drawn = barred({ bars: { first: 2, last: 2 } })
+  expect(drawn.player.getState().tempo).toBe(90)
+  drawn.player.setBars({ first: 1, last: 1 })
+  expect(drawn.player.getState().tempo).toBe(120)
+})
+
+test("a bpm step adds to the tempo where the passage starts", () => {
+  const { api, player } = barred({ bars: { first: 2, last: 2 }, loop: true, stepMode: "bpm", stepValue: 9 })
+  api.playerFinished.emit()
+  expect(player.getState().speed).toBe(1.1)
+})
+
+test("the keys reach the drawn bars only", () => {
+  const { api, player } = barred({ bars: { first: 1, last: 1 } })
+  player.play()
+  api.playerReady.emit()
+  api.tickPosition = 300
+  player.handleKey(press("ArrowRight"))
+  expect(api.tickPosition).toBe(400)
+  player.handleKey(press("ArrowRight"))
+  expect(api.tickPosition).toBe(400)
+  player.handleKey(press("End", { ctrl: true }))
+  expect(api.tickPosition).toBe(400)
+  player.handleKey(press("Home", { ctrl: true }))
+  expect(api.tickPosition).toBe(300)
+  api.tickPosition = 400
+  player.handleKey(press(" ", { ctrl: true }))
+  expect(api.tickPosition).toBe(300)
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 500 })
+})
+
+test("the first play keeps the drawn bars, and a selection made while the sound loads", () => {
+  const { api, player } = barred({ bars: { first: 1, last: 2 } })
+  player.play()
+  api.forget()
+  api.playerReady.emit()
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 600 })
+  expect(player.getState().sound).toBe("ready")
+
+  const later = barred({ bars: { first: 1, last: 2 } })
+  later.player.play()
+  later.player.selectBars({ first: 2, last: 2 })
+  later.api.forget()
+  later.api.playerReady.emit()
+  expect(later.api.playbackRange).toEqual({ startTick: 500, endTick: 600 })
+  expect(selectionLabel(later.player.getState().selection!)).toBe("Bar 3")
+})
+
+test("the range is set again when alphaTab has loaded the MIDI, which drops a range set before it", () => {
+  const { api, moves, player } = barred({ bars: { first: 1, last: 2 } })
+  api.forget()
+  moves.length = 0
+  api.playerReady.emit()
+  expect(api.playbackRange).toEqual({ startTick: 300, endTick: 600 })
+  // The drawn bars are no selection, so no highlight stays on them.
+  expect(moves).toEqual(["range:300-600", "clear-highlight"])
+  expect(player.getState().sound).toBe("off")
+
+  player.selectBars({ first: 2, last: 2 })
+  const selection = player.getState().selection
+  api.forget()
+  moves.length = 0
+  api.playerReady.emit()
+  expect(api.playbackRange).toEqual({ startTick: 500, endTick: 600 })
+  expect(moves).toEqual(["range:500-600"])
+  expect(player.getState().selection).toBe(selection)
+})
+
+test("a mixer given in the options solos its track at the first playerReady, as an app plays one track only", () => {
+  const { api, calls } = fakeApi()
+  const mixer = setSolo(createMixer([1, 1, 0.5]), 1, true)
+  const player = createScorePlayer(api, { mixer })
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  expect(player.getState().mixer.tracks.map((mix) => mix.solo)).toEqual([false, true, false])
+  player.play()
+  calls.length = 0
+  api.playerReady.emit()
+  expect(calls.filter((call) => call.startsWith("solo:"))).toEqual(["solo:0:false", "solo:1:true", "solo:2:false"])
 })

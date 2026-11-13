@@ -39,8 +39,10 @@ export interface UseScorePlayer {
 
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
- * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
- * URL or tex text, so pass the same `Uint8Array` across renders). Browser only: it reads `location`.
+ * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes or score object,
+ * URL or tex text, so pass the same `Uint8Array` or `Score` across renders). The other options are read when the
+ * API is built, except `bars`, which redraws the score without rebuilding, and the callbacks, which are read when
+ * they are called. Browser only: it reads `location`.
  */
 export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
   const host = useRef<HTMLDivElement>(null)
@@ -48,8 +50,10 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
   const latest = useRef(options)
   latest.current = options
   const { source } = options
-  const identity = "bytes" in source ? source.bytes : "url" in source ? source.url : source.tex
-  const kind = "bytes" in source ? "bytes" : "url" in source ? "url" : "tex"
+  const [kind, identity] = sourceIdentity(source)
+  // The bounds, not the object: an equal span from a new object does not redraw.
+  const first = options.bars?.first ?? null
+  const last = options.bars?.last ?? null
 
   useEffect(() => {
     const element = host.current
@@ -85,6 +89,9 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
       get onPracticeTime() {
         return latest.current.onPracticeTime
       },
+      get onSelectionChange() {
+        return latest.current.onSelectionChange
+      },
     }
     const created = createScorePlayer(api, live)
     setPlayer(created)
@@ -114,12 +121,25 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     }
   }, [kind, identity])
 
+  // A change of the drawn bars redraws the score; it does not rebuild the player. The first run finds the bars
+  // the controller was built with, and does nothing.
+  useEffect(() => {
+    player?.setBars(first === null || last === null ? null : { first, last })
+  }, [player, first, last])
+
   const state = useSyncExternalStore(
     player?.subscribe ?? subscribeNothing,
     player?.getState ?? (() => INITIAL_STATE),
     () => INITIAL_STATE,
   )
   return { host, state, actions: player ?? INERT_ACTIONS }
+}
+
+function sourceIdentity(source: ScoreSource): readonly [string, unknown] {
+  if ("bytes" in source) return ["bytes", source.bytes]
+  if ("url" in source) return ["url", source.url]
+  if ("score" in source) return ["score", source.score]
+  return ["tex", source.tex]
 }
 
 const INITIAL_STATE: ScorePlayerState = {
@@ -169,5 +189,6 @@ const INERT_ACTIONS: ScorePlayerActions = {
   setZoom: noop,
   setNotation: noop,
   clearSelection: noop,
+  selectBars: noop,
   handleKey: () => false,
 }

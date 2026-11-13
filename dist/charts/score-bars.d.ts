@@ -8,12 +8,6 @@ export type BarSpan = {
     readonly first: number;
     readonly last: number;
 };
-/**
- * The bars a playback range covers: from the bar its start falls in through the
- * bar its end falls in. The end is exclusive, so a range that ends where a bar
- * begins does not take that bar.
- */
-export declare function barsOfTicks(bars: ReadonlyArray<BarTicks>, startTick: number, endTick: number): BarSpan;
 /** The playback range of a run of bars, from the first bar's start to the last bar's end. */
 export declare function ticksOfBars(bars: ReadonlyArray<BarTicks>, span: BarSpan): {
     startTick: number;
@@ -24,15 +18,17 @@ export declare function barTicksOf(masterBars: ReadonlyArray<{
     readonly start: number;
     calculateDuration(): number;
 }>): Array<BarTicks>;
+/** The bars a beat selection touches: a selection that covers part of a bar counts that whole bar. */
+export declare function barsOfBeatSpan(span: BeatSpan): BarSpan;
 /**
- * The bars a drag selected, given the playback range alphaTab now holds. The
- * drawn bars are the range a view plays by default, so that range is no
- * selection, and neither is no range at all.
+ * The tempo in effect at the start of bar `index`: the nearest tempo marking at or before that bar, since a
+ * tempo change is stored on the bar that makes it. Null when no bar up to it has one.
  */
-export declare function selectedBars(bars: ReadonlyArray<BarTicks>, playbackRange: {
-    readonly startTick: number;
-    readonly endTick: number;
-} | null, drawn: BarSpan | null): BarSpan | null;
+export declare function tempoAtBar(bars: ReadonlyArray<{
+    readonly tempoAutomations: ReadonlyArray<{
+        readonly value: number;
+    }>;
+}>, index: number): number | null;
 /** A span written for a reader, which counts bars from 1: "Bar 3" or "Bars 3–4". */
 export declare function barsLabel(span: BarSpan): string;
 /** Whether two spans name the same bars. Two nulls are the same: no selection. */
@@ -68,4 +64,6 @@ export declare function beatSpanOf(startBeat: BeatLike, endBeat: BeatLike): Beat
  * "Bars 3–5"); any other span names its beats ("Bar 3, beats 1–2").
  */
 export declare function selectionLabel(span: BeatSpan): string;
+/** Whether two selections name the same beats. Two nulls are the same: no selection. */
+export declare function sameBeats(a: BeatSpan | null, b: BeatSpan | null): boolean;
 export {};

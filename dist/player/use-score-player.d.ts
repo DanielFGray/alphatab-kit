@@ -23,7 +23,9 @@ export interface UseScorePlayer {
 }
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
- * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
- * URL or tex text, so pass the same `Uint8Array` across renders). Browser only: it reads `location`.
+ * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes or score object,
+ * URL or tex text, so pass the same `Uint8Array` or `Score` across renders). The other options are read when the
+ * API is built, except `bars`, which redraws the score without rebuilding, and the callbacks, which are read when
+ * they are called. Browser only: it reads `location`.
  */
 export declare function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer;
