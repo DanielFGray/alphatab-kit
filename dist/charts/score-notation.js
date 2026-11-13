@@ -23,3 +23,17 @@ export function toggleNotation(choice, which) {
 export function staffNotation(hasTab, choice) {
     return { standard: choice.standard || !hasTab, tab: hasTab && choice.tab };
 }
+/**
+ * The notation a track shows before the user toggles anything: standard plus
+ * tablature for a guitar or bass, standard alone for every other track. A file's
+ * own tab setting is ignored on purpose, so every app opens the same instrument
+ * with the same notation.
+ *
+ * Guitar and bass are told apart by General MIDI program: 24-31 are guitars,
+ * 32-39 basses. Percussion never shows tab, whatever its program number.
+ */
+export function defaultNotation(track) {
+    const { program } = track.playbackInfo;
+    const isGuitarOrBass = program >= 24 && program <= 39;
+    return { standard: true, tab: isGuitarOrBass && !track.isPercussion };
+}

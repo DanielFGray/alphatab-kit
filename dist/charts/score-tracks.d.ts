@@ -1,13 +1,17 @@
 /**
  * The tracks of a score as a player picks them. A Guitar Pro file can name a
- * track with spaces only or not at all, so the label falls back to the track's
- * place in the file.
+ * track with spaces only or not at all, so the default label falls back to the
+ * track's place in the file.
  */
-type TrackOption = {
+export type TrackOption = {
     readonly index: number;
     readonly label: string;
 };
-export declare function trackOptions(tracks: ReadonlyArray<{
+/**
+ * One option per track, labelled by `label` (default: the trimmed name, or
+ * "Track n" when the name is blank). `label` receives the caller's own track
+ * type, so an app can build a label from fields such as a short name.
+ */
+export declare function trackOptions<T extends {
     readonly name: string;
-}>): Array<TrackOption>;
-export {};
+}>(tracks: ReadonlyArray<T>, label?: (track: T, index: number) => string): Array<TrackOption>;

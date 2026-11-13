@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { BOTH_NOTATIONS, staffNotation, toggleNotation } from "./score-notation.ts"
+import { BOTH_NOTATIONS, defaultNotation, staffNotation, toggleNotation } from "./score-notation.ts"
+
+const track = (program: number, isPercussion = false) => ({ isPercussion, playbackInfo: { program } })
 
 describe("toggleNotation", () => {
   test("turns one notation off while the other stays on", () => {
@@ -22,5 +24,25 @@ describe("staffNotation", () => {
   })
   test("a staff without tab (piano, drums) always keeps standard notation and never shows tab", () => {
     expect(staffNotation(false, { standard: false, tab: true })).toEqual({ standard: true, tab: false })
+  })
+})
+
+describe("defaultNotation", () => {
+  test("a guitar or bass shows standard notation and tab", () => {
+    expect(defaultNotation(track(24))).toEqual(BOTH_NOTATIONS)
+    expect(defaultNotation(track(31))).toEqual(BOTH_NOTATIONS)
+    expect(defaultNotation(track(32))).toEqual(BOTH_NOTATIONS)
+    expect(defaultNotation(track(39))).toEqual(BOTH_NOTATIONS)
+  })
+  test("other stringed instruments and other instruments show standard notation alone", () => {
+    const standardOnly = { standard: true, tab: false }
+    expect(defaultNotation(track(40))).toEqual(standardOnly) // violin
+    expect(defaultNotation(track(105))).toEqual(standardOnly) // banjo
+    expect(defaultNotation(track(0))).toEqual(standardOnly) // piano
+    expect(defaultNotation(track(23))).toEqual(standardOnly) // just below the guitar range
+    expect(defaultNotation(track(41))).toEqual(standardOnly) // viola, just above the bass range
+  })
+  test("a percussion track never shows tab, even on a guitar program number", () => {
+    expect(defaultNotation(track(24, true))).toEqual({ standard: true, tab: false })
   })
 })
