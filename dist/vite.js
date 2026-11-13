@@ -34,7 +34,14 @@ export function alphaTabAssets() {
     const hashedDir = () => (workerDir ??= workerFilesHash(dist).then((hash) => `alphatab/${hash}`));
     return {
         name: "gigbag:assets",
-        config: () => ({ optimizeDeps: { exclude: [ALPHATAB_PACKAGE] } }),
+        // The kit's player must share the app's React and alphaTab. When an app links the kit (`bun link`), the
+        // kit's own devDependency copies would load as well: the player's hooks would run against a React that never
+        // rendered, and the score would never draw, because the render worker built from the app's alphaTab does not
+        // answer the kit's copy.
+        config: () => ({
+            optimizeDeps: { exclude: [ALPHATAB_PACKAGE] },
+            resolve: { dedupe: ["react", "react-dom", ALPHATAB_PACKAGE] },
+        }),
         configResolved(config) {
             isBuild = config.command === "build";
             base = config.base;
