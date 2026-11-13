@@ -22,10 +22,12 @@
     "types": [
       "bun",
       "node"
-    ]
+    ],
+    "resolveJsonModule": true
   },
   "include": [
-    "src"
+    "src",
+    "scripts"
   ],
   "$schema": "./node_modules/@effect/tsgo/schema.json"
 }
