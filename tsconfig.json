@@ -27,7 +27,8 @@
   },
   "include": [
     "src",
-    "scripts"
+    "scripts",
+    "test"
   ],
   "$schema": "./node_modules/@effect/tsgo/schema.json"
 }
