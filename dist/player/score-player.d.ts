@@ -1,4 +1,5 @@
 import { type Mixer } from "../charts/score-mixer.ts";
+import { type Notation } from "../charts/score-notation.ts";
 import { type TrackOption } from "../charts/score-tracks.ts";
 import { type StepMode } from "../charts/speed-trainer.ts";
 /** Where a score comes from: file bytes, a URL alphaTab downloads, or alphaTex source. */
@@ -18,6 +19,8 @@ export interface TrainerState {
 }
 /** The trainer's defaults when the app gives no choice: one loop per step, and a 5 % step. */
 export declare const DEFAULT_TRAINER: TrainerState;
+/** The notation before a score loads: standard only, since no track is known to have strings. */
+export declare const STANDARD_ONLY: Notation;
 /** What the controller shows: all of it derives from alphaTab's events and the actions below. */
 export interface ScorePlayerState {
     /** `loading` until alphaTab has parsed the score; `error` after a load or render failure. */
@@ -43,6 +46,10 @@ export interface ScorePlayerState {
     readonly track: number | null;
     /** Master volume and each track's volume, solo and mute. Holds the saved settings until a score loads. */
     readonly mixer: Mixer;
+    /** The user's zoom, 0.5 to 2.5. The drawn scale is this on top of a base that depends on the host's width. */
+    readonly zoom: number;
+    /** What every track's staves show. It resets to the drawn track's default when a score loads or `setTrack` runs. */
+    readonly notation: Notation;
 }
 /** The actions of a controller. Each is a bound function, so it can be passed on as is. */
 export interface ScorePlayerActions {
@@ -68,6 +75,10 @@ export interface ScorePlayerActions {
     setTrackVolume: (track: number, volume: number) => void;
     setSolo: (track: number, solo: boolean) => void;
     setMute: (track: number, mute: boolean) => void;
+    /** Clamped to the zoom range. Redraws when the scale changes, and calls `onZoomChange`. */
+    setZoom: (zoom: number) => void;
+    /** Flips one notation for every track and redraws. At least one stays on. Calls `onNotationChange`. */
+    setNotation: (which: keyof Notation) => void;
 }
 /** A score player: a state snapshot, a subscription to its changes, and the actions. */
 export interface ScorePlayer extends ScorePlayerActions {
@@ -96,16 +107,39 @@ export interface ScorePlayerOptions {
     readonly mixer?: Mixer;
     /** Called with the new mixer after a user action changes it, not when the load fits it. */
     readonly onMixerChange?: (mixer: Mixer) => void;
+    /** A saved zoom, used from the start. */
+    readonly zoom?: number;
+    /** Called with the new zoom after `setZoom`, not when the options or a width set it. */
+    readonly onZoomChange?: (zoom: number) => void;
+    /** A saved notation. It wins over the track's default on load; `setTrack` still resets to the default. */
+    readonly notation?: Notation;
+    /** Called with the new notation after `setNotation`, not when a load or `setTrack` sets it. */
+    readonly onNotationChange?: (notation: Notation) => void;
+}
+/** The display settings the player writes: how large alphaTab draws, and how tightly it packs bars. */
+export interface DisplaySettings {
+    scale: number;
+    stretchForce: number;
+}
+/** The part of an alphaTab `Staff` the controller sets. */
+export interface PlayerStaff {
+    readonly isStringed: boolean;
+    readonly isPercussion: boolean;
+    showStandardNotation: boolean;
+    showTablature: boolean;
 }
 /** The part of an alphaTab `Track` the controller reads. */
 export interface PlayerTrack {
     readonly index: number;
     readonly name: string;
     readonly shortName: string;
-    /** `volume` is the file's own track volume, 0 to 16. */
+    readonly isPercussion: boolean;
+    /** `volume` is the file's own track volume, 0 to 16; `program` is the General MIDI program. */
     readonly playbackInfo: {
         readonly volume: number;
+        readonly program: number;
     };
+    readonly staves: ReadonlyArray<PlayerStaff>;
 }
 /** An alphaTab event without a payload, as the API exposes it. */
 export interface PlayerEvent {
@@ -139,6 +173,16 @@ export interface PlayerApi {
     readonly error: PlayerEventOf<{
         readonly message: string;
     }>;
+    /** Fires when the container's width changes; alphaTab then applies `settings` and redraws once. */
+    readonly resize: PlayerEventOf<{
+        readonly newWidth: number;
+        readonly settings: {
+            readonly display: DisplaySettings;
+        } | null;
+    }>;
+    readonly container: {
+        readonly width: number;
+    };
     /** Returns false when alphaTab cannot read the data type. */
     load(scoreData: unknown): boolean;
     tex(tex: string): void;
@@ -156,6 +200,13 @@ export interface PlayerApi {
     changeTrackVolume(tracks: PlayerTrack[], volume: number): void;
     changeTrackSolo(tracks: PlayerTrack[], solo: boolean): void;
     changeTrackMute(tracks: PlayerTrack[], mute: boolean): void;
+    readonly settings: {
+        readonly display: DisplaySettings;
+    };
+    /** Applies `settings` to the renderer; it does not draw. */
+    updateSettings(): void;
+    /** Draws the loaded score again with the current settings. */
+    render(): void;
     /** Draws only these tracks. The sound is unchanged: alphaTab makes the MIDI from the whole score. */
     renderTracks(tracks: PlayerTrack[]): void;
 }
@@ -172,7 +223,11 @@ export interface PlayerApi {
  * The trainer's loop count lives here, not in the state: it is progress, not a setting. Stop, seek, a
  * loop toggle and a speed the player chose restart it, so a count never carries across a jump.
  *
- * `options.trackLabel` and `options.onMixerChange` are read when they are needed, not at creation, so a
+ * The scale is the user's zoom on the base for the host's width (`displayForWidth`); until the host's width is known
+ * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
+ * only once a score is loaded: before that the settings are set and the first draw uses them.
+ *
+ * `options.trackLabel` and the `on...Change` callbacks are read when they are needed, not at creation, so a
  * caller can pass an object whose getters return its latest callbacks.
  */
 export declare function createScorePlayer(api: PlayerApi, options?: ScorePlayerOptions): ScorePlayer;

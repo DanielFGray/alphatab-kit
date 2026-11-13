@@ -1,9 +1,14 @@
 import { synth } from "@coderline/alphatab";
 import { createMixer, fitMixer, setMaster, setMute, setSolo, setTrackVolume, } from "../charts/score-mixer.js";
+import { displayForWidth } from "../charts/score-layout.js";
+import { defaultNotation, staffNotation, toggleNotation } from "../charts/score-notation.js";
+import { clampZoom } from "../charts/score-zoom.js";
 import { trackOptions } from "../charts/score-tracks.js";
 import { clampSpeed, nextSpeed } from "../charts/speed-trainer.js";
 /** The trainer's defaults when the app gives no choice: one loop per step, and a 5 % step. */
 export const DEFAULT_TRAINER = { loop: false, loopCount: 1, stepMode: "percent", stepValue: 5 };
+/** The notation before a score loads: standard only, since no track is known to have strings. */
+export const STANDARD_ONLY = { standard: true, tab: false };
 /**
  * Drives `api`: it listens to alphaTab's events and keeps the state from them, and its actions call the API.
  *
@@ -17,7 +22,11 @@ export const DEFAULT_TRAINER = { loop: false, loopCount: 1, stepMode: "percent",
  * The trainer's loop count lives here, not in the state: it is progress, not a setting. Stop, seek, a
  * loop toggle and a speed the player chose restart it, so a count never carries across a jump.
  *
- * `options.trackLabel` and `options.onMixerChange` are read when they are needed, not at creation, so a
+ * The scale is the user's zoom on the base for the host's width (`displayForWidth`); until the host's width is known
+ * the base is the full-width one. A redraw happens only when the scale or stretch changed, and
+ * only once a score is loaded: before that the settings are set and the first draw uses them.
+ *
+ * `options.trackLabel` and the `on...Change` callbacks are read when they are needed, not at creation, so a
  * caller can pass an object whose getters return its latest callbacks.
  */
 export function createScorePlayer(api, options = {}) {
@@ -36,6 +45,8 @@ export function createScorePlayer(api, options = {}) {
         tracks: [],
         track: null,
         mixer: options.mixer ?? createMixer([]),
+        zoom: clampZoom(options.zoom ?? 1),
+        notation: options.notation ?? STANDARD_ONLY,
         trainer: {
             loop: options.loop ?? DEFAULT_TRAINER.loop,
             loopCount: options.loopCount ?? DEFAULT_TRAINER.loopCount,
@@ -89,19 +100,55 @@ export function createScorePlayer(api, options = {}) {
         send();
         options.onMixerChange?.(next);
     };
+    // The host's width, from alphaTab's resize event; null while unknown, which means the full-width row.
+    let width = null;
+    // Writes the display settings for the current width and zoom into `display`. True when they changed.
+    const setDisplay = (display) => {
+        const { scale, stretchForce } = displayForWidth(width ?? Number.POSITIVE_INFINITY, state.zoom);
+        if (display.scale === scale && display.stretchForce === stretchForce)
+            return false;
+        display.scale = scale;
+        display.stretchForce = stretchForce;
+        return true;
+    };
+    // Sets which staves every track draws; the next draw uses it. A staff without strings keeps standard notation.
+    const applyNotation = (choice) => {
+        for (const track of scoreTracks) {
+            for (const staff of track.staves) {
+                const shown = staffNotation(staff.isStringed && !staff.isPercussion, choice);
+                staff.showStandardNotation = shown.standard;
+                staff.showTablature = shown.tab;
+            }
+        }
+    };
     const drawTrack = (index) => {
         const track = scoreTracks[index];
         if (!track)
             return;
+        const notation = defaultNotation(track);
+        applyNotation(notation);
         api.renderTracks([track]);
-        update({ track: index });
+        update({ track: index, notation });
     };
     // alphaTab keeps these volumes and the speed until its player exists, so they can be set now.
     api.metronomeVolume = state.metronome ? 1 : 0;
     api.countInVolume = state.countIn ? 1 : 0;
     api.playbackSpeed = state.speed;
     api.isLooping = state.trainer.loop;
+    // alphaTab fires its first resize inside its constructor, before this player can listen, so read the width.
+    const initialWidth = api.container.width;
+    if (initialWidth > 0)
+        width = initialWidth;
+    if (setDisplay(api.settings.display))
+        api.updateSettings();
     const unsubscribers = [
+        // alphaTab applies these settings and redraws after the event, so this handler neither updates nor renders.
+        api.resize.on((args) => {
+            if (!args.settings || !(args.newWidth > 0))
+                return;
+            width = args.newWidth;
+            setDisplay(args.settings.display);
+        }),
         api.scoreLoaded.on((score) => {
             baseTempo = score.tempo > 0 ? score.tempo : null;
             scoreTracks = score.tracks;
@@ -110,6 +157,10 @@ export function createScorePlayer(api, options = {}) {
             const wanted = options.defaultTrack ?? 0;
             const first = Number.isInteger(wanted) && wanted >= 0 && wanted < scoreTracks.length ? wanted : 0;
             api.masterVolume = mixer.master;
+            const drawn = scoreTracks[first];
+            const notation = options.notation ?? (drawn ? defaultNotation(drawn) : state.notation);
+            // alphaTab fires this event before its first draw, so the staves set here need no extra draw.
+            applyNotation(notation);
             update({
                 status: "ready",
                 error: null,
@@ -117,6 +168,7 @@ export function createScorePlayer(api, options = {}) {
                 tracks: trackOptions(scoreTracks, options.trackLabel),
                 track: scoreTracks.length > 0 ? first : null,
                 mixer,
+                notation,
             });
             // alphaTab chose track 0 for this load and draws after this event. renderTracks switches the
             // track first, at the cost of one extra draw (the load still runs its own).
@@ -221,6 +273,25 @@ export function createScorePlayer(api, options = {}) {
         },
         setMute: (track, mute) => {
             changeMixer(setMute(state.mixer, track, mute), () => api.changeTrackMute([scoreTracks[track]], mute));
+        },
+        setZoom: (zoom) => {
+            const clamped = clampZoom(zoom);
+            update({ zoom: clamped });
+            // alphaTab does not redraw for a settings change on its own, so a zoom update and draw is ours.
+            if (setDisplay(api.settings.display)) {
+                api.updateSettings();
+                if (scoreTracks.length > 0)
+                    api.render();
+            }
+            options.onZoomChange?.(clamped);
+        },
+        setNotation: (which) => {
+            const next = toggleNotation(state.notation, which);
+            update({ notation: next });
+            applyNotation(next);
+            if (scoreTracks.length > 0)
+                api.render();
+            options.onNotationChange?.(next);
         },
         dispose: () => {
             for (const unsubscribe of unsubscribers)

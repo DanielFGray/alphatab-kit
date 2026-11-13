@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlphaTabApi, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
 import { createMixer } from "../charts/score-mixer.js";
-import { createScorePlayer, DEFAULT_TRAINER, } from "./score-player.js";
+import { createScorePlayer, DEFAULT_TRAINER, STANDARD_ONLY, } from "./score-player.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
  * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
@@ -40,6 +40,12 @@ export function useScorePlayer(options) {
             get onMixerChange() {
                 return latest.current.onMixerChange;
             },
+            get onZoomChange() {
+                return latest.current.onZoomChange;
+            },
+            get onNotationChange() {
+                return latest.current.onNotationChange;
+            },
         };
         const created = createScorePlayer(api, live);
         setPlayer(created);
@@ -69,6 +75,8 @@ const INITIAL_STATE = {
     tracks: [],
     track: null,
     mixer: createMixer([]),
+    zoom: 1,
+    notation: STANDARD_ONLY,
 };
 const subscribeNothing = () => () => { };
 const noop = () => { };
@@ -91,4 +99,6 @@ const INERT_ACTIONS = {
     setTrackVolume: noop,
     setSolo: noop,
     setMute: noop,
+    setZoom: noop,
+    setNotation: noop,
 };

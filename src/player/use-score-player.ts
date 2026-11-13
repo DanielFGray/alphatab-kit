@@ -10,6 +10,7 @@ import {
   type ScorePlayerOptions,
   type ScorePlayerState,
   type ScoreSource,
+  STANDARD_ONLY,
 } from "./score-player.ts"
 
 export interface UseScorePlayerOptions extends ScorePlayerOptions {
@@ -66,6 +67,12 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
       get onMixerChange() {
         return latest.current.onMixerChange
       },
+      get onZoomChange() {
+        return latest.current.onZoomChange
+      },
+      get onNotationChange() {
+        return latest.current.onNotationChange
+      },
     }
     const created = createScorePlayer(api, live)
     setPlayer(created)
@@ -101,6 +108,8 @@ const INITIAL_STATE: ScorePlayerState = {
   tracks: [],
   track: null,
   mixer: createMixer([]),
+  zoom: 1,
+  notation: STANDARD_ONLY,
 }
 
 const subscribeNothing = () => () => {}
@@ -126,4 +135,6 @@ const INERT_ACTIONS: ScorePlayerActions = {
   setTrackVolume: noop,
   setSolo: noop,
   setMute: noop,
+  setZoom: noop,
+  setNotation: noop,
 }

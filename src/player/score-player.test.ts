@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
 import { synth } from "@coderline/alphatab"
 import { createMixer, setMute, setSolo, setTrackVolume } from "../charts/score-mixer.ts"
-import { createScorePlayer, type PlayerApi, type PlayerTrack } from "./score-player.ts"
+import type { Notation } from "../charts/score-notation.ts"
+import { createScorePlayer, type DisplaySettings,
+  type PlayerApi, type PlayerStaff, type PlayerTrack } from "./score-player.ts"
 
 class Emitter<T = void> {
   handlers = new Set<(value: T) => void>()
@@ -22,11 +24,20 @@ class ScoreLoadedEmitter extends Emitter<{ tempo: number; tracks: ReadonlyArray<
 }
 
 /** A track whose file volume is `volume` / 16. */
-const track = (index: number, name: string, volume = 16): PlayerTrack => ({
+const track = (index: number, name: string, volume = 16, program = 25, isPercussion = false): PlayerTrack => ({
   index,
   name,
   shortName: name.slice(0, 3),
-  playbackInfo: { volume },
+  isPercussion,
+  playbackInfo: { volume, program },
+  staves: [
+    {
+      isStringed: program >= 24 && program <= 39,
+      isPercussion,
+      showStandardNotation: true,
+      showTablature: false,
+    },
+  ],
 })
 
 const SCORE_TRACKS = [track(0, "Guitar", 16), track(1, "  "), track(2, "Bass", 8)]
@@ -42,6 +53,8 @@ function fakeApi() {
     playerPositionChanged: new Emitter<{ currentTime: number; endTime: number }>(),
     playerFinished: new Emitter(),
     error: new Emitter<{ message: string }>(),
+    resize: new Emitter<{ newWidth: number; settings: { display: DisplaySettings } | null }>(),
+    container: { width: 1024 },
     accepts: true,
     timePosition: 0,
     metronomeVolume: 0,
@@ -56,6 +69,9 @@ function fakeApi() {
     changeTrackMute: (tracks: PlayerTrack[], mute: boolean) =>
       void calls.push(`mute:${tracks.map((track) => track.index).join()}:${mute}`),
     renderTracks: (tracks: PlayerTrack[]) => void calls.push(`render:${tracks.map((track) => track.index).join()}`),
+    settings: { display: { scale: 1, stretchForce: 1 } },
+    updateSettings: () => void calls.push("updateSettings"),
+    render: () => void calls.push("render"),
     load(data: unknown) {
       calls.push(`load:${typeof data === "string" ? data : "bytes"}`)
       return api.accepts
@@ -78,6 +94,7 @@ const handlerCount = (api: ReturnType<typeof fakeApi>["api"]) =>
     api.playerStateChanged,
     api.playerPositionChanged,
     api.playerFinished,
+    api.resize,
     api.error,
   ].reduce(
     (sum, emitter) => sum + emitter.handlers.size,
@@ -408,4 +425,140 @@ test("a volume above the range is clamped before it reaches the API", () => {
   player.setMasterVolume(-1)
   expect(calls).toEqual(["volume:0:1"])
   expect(api.masterVolume).toBe(0)
+})
+
+const display = (api: ReturnType<typeof fakeApi>["api"]) => api.settings.display
+
+test("a zoom is clamped, drawn at once, and reported to the callback", () => {
+  const { api, calls } = fakeApi()
+  const zooms: number[] = []
+  const player = createScorePlayer(api, { onZoomChange: (zoom) => zooms.push(zoom) })
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  player.setZoom(9)
+  expect(player.getState().zoom).toBe(2.5)
+  expect(display(api).scale).toBe(2.5)
+  player.setZoom(0.1)
+  expect(display(api).scale).toBe(0.5)
+  expect(zooms).toEqual([2.5, 0.5])
+  expect(calls).toEqual(["updateSettings", "render", "updateSettings", "render"])
+})
+
+test("a resize event writes the band's scale and stretch into its settings and leaves the draw to alphaTab", () => {
+  const { api, calls } = fakeApi()
+  createScorePlayer(api, { zoom: 2 })
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  calls.length = 0
+  const settings = { display: { scale: 1, stretchForce: 1 } }
+  api.resize.emit({ newWidth: 300, settings })
+  expect(settings.display).toEqual({ scale: 0.78 * 2, stretchForce: 0.82 })
+  api.resize.emit({ newWidth: 1200, settings })
+  expect(settings.display).toEqual({ scale: 2, stretchForce: 1 })
+  api.resize.emit({ newWidth: 300, settings: null })
+  expect(calls).toEqual([])
+})
+
+test("a zoom after a resize uses the stored width", () => {
+  const { api, calls } = fakeApi()
+  const player = createScorePlayer(api)
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  api.resize.emit({ newWidth: 400, settings: { display: { scale: 1, stretchForce: 1 } } })
+  player.setZoom(2)
+  expect(display(api)).toEqual({ scale: 0.84 * 2, stretchForce: 0.88 })
+  expect(calls).toEqual(["updateSettings", "render"])
+})
+
+test("the first display comes from the container's width, and draws nothing", () => {
+  const { api, calls } = fakeApi()
+  api.container.width = 500
+  createScorePlayer(api, { zoom: 1.5 })
+  expect(display(api)).toEqual({ scale: 0.9 * 1.5, stretchForce: 0.94 })
+  expect(calls).toEqual(["updateSettings"])
+})
+
+test("a saved zoom is used on load and is not reported", () => {
+  const { api, calls } = fakeApi()
+  const zooms: number[] = []
+  const player = createScorePlayer(api, { zoom: 1.5, onZoomChange: (zoom) => zooms.push(zoom) })
+  expect(player.getState().zoom).toBe(1.5)
+  expect(display(api).scale).toBe(1.5)
+  api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })
+  expect(zooms).toEqual([])
+  expect(calls).toEqual(["updateSettings"])
+})
+
+const shown = (staff: PlayerStaff) => ({ standard: staff.showStandardNotation, tab: staff.showTablature })
+
+test("a guitar shows standard plus tab, a piano and a drum track show standard only", () => {
+  const { api } = fakeApi()
+  const player = createScorePlayer(api, { defaultTrack: 0 })
+  const tracks = [
+    track(0, "Guitar", 16, 25),
+    track(1, "Piano", 16, 0),
+    track(2, "Drums", 16, 0, true),
+    track(3, "Bass", 16, 33),
+  ]
+  api.scoreLoaded.emit({ tempo: 120, tracks })
+  expect(player.getState().notation).toEqual({ standard: true, tab: true })
+  expect(tracks.map((t) => shown(t.staves[0]!))).toEqual([
+    { standard: true, tab: true },
+    { standard: true, tab: false },
+    { standard: true, tab: false },
+    { standard: true, tab: true },
+  ])
+})
+
+test("the drawn track sets the notation: a piano or a drum track draws standard only", () => {
+  for (const [wanted, tracks] of [
+    [1, [track(0, "Guitar", 16, 25), track(1, "Piano", 16, 0)]],
+    [1, [track(0, "Guitar", 16, 25), track(1, "Drums", 16, 30, true)]],
+  ] as const) {
+    const { api } = fakeApi()
+    const player = createScorePlayer(api, { defaultTrack: wanted })
+    api.scoreLoaded.emit({ tempo: 120, tracks })
+    expect(player.getState().notation).toEqual({ standard: true, tab: false })
+  }
+})
+
+test("a saved notation wins on load, and a load does not call the callback", () => {
+  const { api } = fakeApi()
+  const saved: Notation[] = []
+  const player = createScorePlayer(api, {
+    notation: { standard: false, tab: true },
+    onNotationChange: (n) => saved.push(n),
+  })
+  const tracks = [track(0, "Guitar", 16, 25)]
+  api.scoreLoaded.emit({ tempo: 120, tracks })
+  expect(player.getState().notation).toEqual({ standard: false, tab: true })
+  expect(shown(tracks[0]!.staves[0]!)).toEqual({ standard: false, tab: true })
+  expect(saved).toEqual([])
+})
+
+test("setTrack resets the notation to the new track's default", () => {
+  const { api } = fakeApi()
+  const player = createScorePlayer(api)
+  api.scoreLoaded.emit({ tempo: 120, tracks: [track(0, "Guitar", 16, 25), track(1, "Piano", 16, 0)] })
+  player.setNotation("standard")
+  expect(player.getState().notation).toEqual({ standard: false, tab: true })
+  player.setTrack(1)
+  expect(player.getState().notation).toEqual({ standard: true, tab: false })
+  player.setTrack(0)
+  expect(player.getState().notation).toEqual({ standard: true, tab: true })
+})
+
+test("a toggle applies to every staff, draws, and reports; a staff without strings keeps standard", () => {
+  const { api, calls } = fakeApi()
+  const saved: Notation[] = []
+  const player = createScorePlayer(api, { onNotationChange: (n) => saved.push(n) })
+  const tracks = [track(0, "Guitar", 16, 25), track(1, "Piano", 16, 0)]
+  api.scoreLoaded.emit({ tempo: 120, tracks })
+  player.setNotation("standard")
+  expect(player.getState().notation).toEqual({ standard: false, tab: true })
+  expect(tracks.map((t) => shown(t.staves[0]!))).toEqual([
+    { standard: false, tab: true },
+    { standard: true, tab: false },
+  ])
+  expect(calls).toEqual(["render"])
+  expect(saved).toEqual([{ standard: false, tab: true }])
+  player.setNotation("tab")
+  expect(player.getState().notation).toEqual({ standard: true, tab: false })
 })
