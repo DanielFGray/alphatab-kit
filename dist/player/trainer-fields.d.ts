@@ -22,7 +22,6 @@ export type TrainerFieldsProps = TrainerProps & {
 /**
  * The speed trainer's settings: the passage and tempo readout, the loop switch,
  * how many loops before each speed-up, and the step size in percent or BPM.
- * It renders a fragment, so the app's container lays out its children. The
- * tempo readout multiplies the score's tempo by `speed`, rounded to one decimal.
+ * It renders a fragment, so the app's container lays out its children.
  */
-export declare function TrainerFields({ speed, parts, ...props }: TrainerFieldsProps): import("react").JSX.Element;
+export declare function TrainerFields({ speed, tempo, parts, ...props }: TrainerFieldsProps): import("react").JSX.Element;

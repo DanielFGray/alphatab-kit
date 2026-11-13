@@ -25,11 +25,9 @@ export type TrainerFieldsProps = TrainerProps & {
 /**
  * The speed trainer's settings: the passage and tempo readout, the loop switch,
  * how many loops before each speed-up, and the step size in percent or BPM.
- * It renders a fragment, so the app's container lays out its children. The
- * tempo readout multiplies the score's tempo by `speed`, rounded to one decimal.
+ * It renders a fragment, so the app's container lays out its children.
  */
-export function TrainerFields({ speed, parts, ...props }: TrainerFieldsProps) {
-  const tempo = props.tempo === null ? null : Number.parseFloat((props.tempo * speed).toFixed(1))
+export function TrainerFields({ speed, tempo, parts, ...props }: TrainerFieldsProps) {
   return (
     <>
       <p {...partProps(parts, "intro")}>

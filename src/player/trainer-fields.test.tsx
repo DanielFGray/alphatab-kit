@@ -46,8 +46,8 @@ function choose(select: HTMLSelectElement, value: string) {
   })
 }
 
-test("the tempo line multiplies the score's tempo by the speed, to one decimal", () => {
-  mounted = render(<TrainerFields {...idle} speed={0.75} />)
+test("the tempo line shows the tempo at the current speed and the speed", () => {
+  mounted = render(<TrainerFields {...idle} tempo={90} speed={0.75} />)
   expect(field(mounted.host, "tempo").textContent).toBe("Whole piece · 90 BPM (0.75×)")
 })
 
