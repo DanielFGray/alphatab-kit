@@ -4,6 +4,7 @@ import { alphaTabAssetUrls } from "../index.js";
 import { createMixer } from "../charts/score-mixer.js";
 import { createScorePlayer, DEFAULT_TRAINER, STANDARD_ONLY, } from "./score-player.js";
 import { targetUsesKey } from "./keyboard.js";
+import { inkFrom, observeTheme } from "./ink.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
  * The API is destroyed on unmount and rebuilt when the source changes (compared by the bytes object,
@@ -31,6 +32,7 @@ export function useScorePlayer(options) {
         settings.player.playerMode = PlayerMode.EnabledExternalMedia;
         settings.player.enableCursor = true;
         settings.player.soundFont = urls.soundFont;
+        inkFrom(settings, getComputedStyle(element).color);
         configure?.(settings);
         const api = new AlphaTabApi(element, settings);
         // Getters, so a callback from a later render is the one called: this controller is built once.
@@ -55,6 +57,13 @@ export function useScorePlayer(options) {
         const created = createScorePlayer(api, live);
         setPlayer(created);
         created.load(current);
+        // The ink follows the text color around the host: a theme toggle on the root element redraws the score in it.
+        const stopTheme = observeTheme(() => {
+            inkFrom(api.settings, getComputedStyle(element).color);
+            api.updateSettings();
+            if (created.getState().status === "ready")
+                api.render();
+        });
         // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
         // where the app's controls live too, so a shortcut works with focus on any of them unless that control
         // uses the key itself (targetUsesKey).
@@ -70,6 +79,7 @@ export function useScorePlayer(options) {
         keys.addEventListener("keydown", onKeyDown, true);
         return () => {
             keys.removeEventListener("keydown", onKeyDown, true);
+            stopTheme();
             created.dispose();
             api.destroy();
             setPlayer(null);

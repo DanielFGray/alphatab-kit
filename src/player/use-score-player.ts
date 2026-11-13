@@ -13,13 +13,19 @@ import {
   STANDARD_ONLY,
 } from "./score-player.ts"
 import { targetUsesKey } from "./keyboard.ts"
+import { inkFrom, observeTheme } from "./ink.ts"
 
 export interface UseScorePlayerOptions extends ScorePlayerOptions {
   readonly source: ScoreSource
   /**
-   * Edits alphaTab's settings before the API is built: an app adds its colours, scroll element and
-   * hidden elements here. The kit has already set the engine, the player and the asset URLs.
-   * Only the function from the render that builds the API runs.
+   * Edits alphaTab's settings before the API is built: an app adds its padding, scroll element and
+   * hidden elements here. The kit has already set the engine, the player, the asset URLs and the ink (the
+   * host's text color). Only the function from the render that builds the API runs.
+   *
+   * This is the place for `settings.player.scrollElement` when the app scrolls the score inside its own box:
+   * alphaTab resolves that setting on its first scroll and keeps the element, so a later change has no effect.
+   * An app whose scroll box changes rebuilds the player (a new `key` on the component that calls the hook).
+   * A theme change re-applies the ink only; colors set here are not kept over it.
    */
   readonly configure?: (settings: Settings) => void
 }
@@ -58,6 +64,7 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     settings.player.playerMode = PlayerMode.EnabledExternalMedia
     settings.player.enableCursor = true
     settings.player.soundFont = urls.soundFont
+    inkFrom(settings, getComputedStyle(element).color)
     configure?.(settings)
     const api = new AlphaTabApi(element, settings)
     // Getters, so a callback from a later render is the one called: this controller is built once.
@@ -82,6 +89,12 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     const created = createScorePlayer(api, live)
     setPlayer(created)
     created.load(current)
+    // The ink follows the text color around the host: a theme toggle on the root element redraws the score in it.
+    const stopTheme = observeTheme(() => {
+      inkFrom(api.settings, getComputedStyle(element).color)
+      api.updateSettings()
+      if (created.getState().status === "ready") api.render()
+    })
     // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
     // where the app's controls live too, so a shortcut works with focus on any of them unless that control
     // uses the key itself (targetUsesKey).
@@ -94,6 +107,7 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     keys.addEventListener("keydown", onKeyDown, true)
     return () => {
       keys.removeEventListener("keydown", onKeyDown, true)
+      stopTheme()
       created.dispose()
       api.destroy()
       setPlayer(null)
