@@ -36,7 +36,8 @@
     "prepare": "effect-tsgo patch --typescript --oxlint",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "lint": "oxlint --type-aware"
+    "lint": "oxlint --type-aware",
+    "bench:voicing": "bun scripts/benchVoicing.ts"
   },
   "peerDependencies": {
     "@coderline/alphatab": "*",
@@ -77,5 +78,8 @@
     "chordsheetjs": "18.0.0",
     "diff-match-patch": "1.0.5",
     "perfect-freehand": "1.2.3"
+  },
+  "patchedDependencies": {
+    "@coderline/alphatab@1.9.0-alpha.1891": "patches/alphatab-1.9.0-alpha.1891.patch"
   }
 }

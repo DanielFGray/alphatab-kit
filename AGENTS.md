@@ -21,3 +21,5 @@ Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
 
 If you need to learn more about particular Effect apis and concepts that the
 guide doesn't cover, search through the source code in `node_modules/effect/src`.
+
+The kit applies the same patch to its own alphaTab (`patchedDependencies` in package.json): the chart tests read lyrics from scores and rely on the tied-note fix.

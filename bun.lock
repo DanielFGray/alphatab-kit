@@ -37,6 +37,9 @@
       ],
     },
   },
+  "patchedDependencies": {
+    "@coderline/alphatab@1.9.0-alpha.1891": "patches/alphatab-1.9.0-alpha.1891.patch",
+  },
   "packages": {
     "@coderline/alphatab": ["@coderline/alphatab@1.9.0-alpha.1891", "", {}, "sha512-xNFwkKFcB9C8Kx0fY2pQmFgEG4vb6j2V3VVXlDQDoWwBpO3GbmHd2kxVsisFr64vMqEDo577ZUifWkad0sFPZg=="],
 
