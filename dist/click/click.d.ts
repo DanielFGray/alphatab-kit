@@ -22,8 +22,12 @@ export declare const CLICK_BAND_HALF_WIDTH_HZ = 500;
  * (listener.ts), so a note played with the click reads 0 ms.
  */
 export declare const CLICK_ONSET_SECONDS: number;
-/** Two bars: the session needs at least four clicks to measure the speaker-to-mic delay. */
-export declare const COUNT_IN_BEATS: number;
+/**
+ * Beats in the count-in: whole bars, at least two of them, and at least four
+ * beats, because the session needs at least four clicks to measure the
+ * speaker-to-mic delay. `beatsPerBar` is a whole number from 1.
+ */
+export declare const countInBeats: (beatsPerBar: number) => number;
 /** The first beat of each bar is accented. */
 export declare const ACCENT_GAIN = 1;
 export declare const BEAT_GAIN = 0.55;

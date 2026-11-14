@@ -1,6 +1,5 @@
 import { describe, expect, it, setDefaultTimeout } from "bun:test"
-import { BEATS_PER_BAR } from "../charts/take.ts"
-import { ACCENT_GAIN, BEAT_GAIN, COUNT_IN_BEATS } from "./click.ts"
+import { ACCENT_GAIN, BEAT_GAIN, countInBeats } from "./click.ts"
 import { Session, type SessionEvent, type SessionPlan } from "./session.ts"
 import { drum, keyNote, mix, mixClick, noise, pluck, SAMPLE_RATE } from "./synth.ts"
 import { placeHit, type Subdivision } from "./timing.ts"
@@ -16,6 +15,7 @@ interface Take {
   readonly latencySeconds: number
   readonly notes: ReadonlyArray<Played>
   readonly bpm?: number
+  readonly beatsPerBar?: number
   readonly subdivision?: Subdivision
   readonly clickLevel?: number
   /** Peak of the background noise. */
@@ -38,6 +38,7 @@ const listen = ({
   latencySeconds,
   notes,
   bpm = 100,
+  beatsPerBar = 4,
   subdivision = 1,
   clickLevel = 0.5,
   noiseLevel = 0.001,
@@ -48,16 +49,16 @@ const listen = ({
     sampleRate: SAMPLE_RATE,
     firstClick: FIRST_FRAME + Math.round(0.2 * SAMPLE_RATE),
     framesPerBeat: (60 / bpm) * SAMPLE_RATE,
-    countInBeats: COUNT_IN_BEATS,
+    countInBeats: countInBeats(beatsPerBar),
   }
-  const beats = COUNT_IN_BEATS + Math.ceil((notes.at(-1)?.step ?? 0) / subdivision) + 3
+  const beats = plan.countInBeats + Math.ceil((notes.at(-1)?.step ?? 0) / subdivision) + 3
   const signal = noise(Math.round(plan.firstClick - FIRST_FRAME + beats * plan.framesPerBeat), noiseLevel, 7)
   const latency = Math.round(latencySeconds * SAMPLE_RATE)
   for (let beat = 0; beat < beats; beat++) {
-    const gain = clickLevel * (beat % BEATS_PER_BAR === 0 ? ACCENT_GAIN : BEAT_GAIN)
+    const gain = clickLevel * (beat % beatsPerBar === 0 ? ACCENT_GAIN : BEAT_GAIN)
     mixClick(signal, Session.clickFrame(plan, beat) + latency - FIRST_FRAME, gain)
   }
-  const firstBeat = Session.clickFrame(plan, COUNT_IN_BEATS)
+  const firstBeat = Session.clickFrame(plan, plan.countInBeats)
   for (const note of notes) {
     const at =
       firstBeat + latency + (note.step * plan.framesPerBeat) / subdivision + (note.offsetMs / 1000) * SAMPLE_RATE
@@ -141,11 +142,17 @@ describe("Session", () => {
     expectHits(listen({ latencySeconds: 0.087, notes, subdivision: 2 }), notes, 3, 2)
   })
 
+  it("times notes in 3/4, and in 6/8 clicked on its two dotted beats with eighths scored", () => {
+    const notes = OFFSETS_MS.map((offsetMs, step) => ({ step, offsetMs, sound: drum(SAMPLE_RATE, step + 1) }))
+    expectHits(listen({ latencySeconds: 0.087, notes, beatsPerBar: 3 }), notes, 1)
+    expectHits(listen({ latencySeconds: 0.087, notes, beatsPerBar: 2, subdivision: 3 }), notes, 1, 3)
+  })
+
   it("measures the latency when a drum plays in every count-in beat, on the click or off it", () => {
     // A drum is loud in every band, the click's among them. At 100 BPM a beat is 600 ms.
     for (const offsetBeats of [-0.3, 0.02, 0.2, 0.5]) {
       for (const gain of [1, 3]) {
-        const hits = Array.from({ length: COUNT_IN_BEATS }, (_, beat) => {
+        const hits = Array.from({ length: countInBeats(4) }, (_, beat) => {
           const sound = drum(SAMPLE_RATE, 40 + beat).map((x) => x * gain)
           return [sound, Math.round((beat + offsetBeats) * 0.6 * SAMPLE_RATE + 0.05 * SAMPLE_RATE)] as const
         })

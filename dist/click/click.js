@@ -1,4 +1,3 @@
-import { BEATS_PER_BAR } from "../charts/take.js";
 /**
  * The metronome click is a short tone at one pitch. The mic hears it through
  * the speakers, so the listener splits the spectrum in two: the click bands
@@ -30,8 +29,12 @@ const HALF_LENGTH_SIGMAS = 5;
  * (listener.ts), so a note played with the click reads 0 ms.
  */
 export const CLICK_ONSET_SECONDS = (HALF_LENGTH_SIGMAS - Math.sqrt(Math.LN2)) * SIGMA_SECONDS;
-/** Two bars: the session needs at least four clicks to measure the speaker-to-mic delay. */
-export const COUNT_IN_BEATS = 2 * BEATS_PER_BAR;
+/**
+ * Beats in the count-in: whole bars, at least two of them, and at least four
+ * beats, because the session needs at least four clicks to measure the
+ * speaker-to-mic delay. `beatsPerBar` is a whole number from 1.
+ */
+export const countInBeats = (beatsPerBar) => beatsPerBar * Math.max(2, Math.ceil(4 / beatsPerBar));
 /** The first beat of each bar is accented. */
 export const ACCENT_GAIN = 1;
 export const BEAT_GAIN = 0.55;

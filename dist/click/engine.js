@@ -1,6 +1,5 @@
 import { Effect, Queue, Schedule, Schema, Stream } from "effect";
-import { BEATS_PER_BAR } from "../charts/take.js";
-import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, COUNT_IN_BEATS } from "./click.js";
+import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, countInBeats } from "./click.js";
 import { Session } from "./session.js";
 import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.js";
 /**
@@ -9,7 +8,7 @@ import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.js"
  * the mic and emits what the session hears. Interrupting the stream stops the
  * audio and closes the mic.
  */
-export const clickTrack = ({ bpm, listen }) => Stream.callback((queue) => Effect.gen(function* () {
+export const clickTrack = ({ bpm, beatsPerBar, listen }) => Stream.callback((queue) => Effect.gen(function* () {
     const context = yield* Effect.acquireRelease(Effect.sync(() => new AudioContext({ latencyHint: "interactive" })), (context) => Effect.promise(() => context.close()));
     yield* attempt("The browser would not start audio.", () => context.resume());
     const sampleRate = context.sampleRate;
@@ -17,7 +16,7 @@ export const clickTrack = ({ bpm, listen }) => Stream.callback((queue) => Effect
         sampleRate,
         firstClick: Math.round((context.currentTime + START_DELAY_SECONDS) * sampleRate),
         framesPerBeat: (60 / bpm) * sampleRate,
-        countInBeats: COUNT_IN_BEATS,
+        countInBeats: countInBeats(beatsPerBar),
     };
     if (listen)
         yield* hearMic(context, plan, (event) => Queue.offerUnsafe(queue, event));
@@ -29,7 +28,7 @@ export const clickTrack = ({ bpm, listen }) => Stream.callback((queue) => Effect
         for (; Session.clickFrame(plan, next) / sampleRate < horizon; next++) {
             const at = Session.clickFrame(plan, next) / sampleRate;
             const gain = context.createGain();
-            gain.gain.value = CLICK_VOLUME * (next % BEATS_PER_BAR === 0 ? ACCENT_GAIN : BEAT_GAIN);
+            gain.gain.value = CLICK_VOLUME * (next % beatsPerBar === 0 ? ACCENT_GAIN : BEAT_GAIN);
             const source = context.createBufferSource();
             source.buffer = click;
             source.connect(gain).connect(context.destination);

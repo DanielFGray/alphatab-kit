@@ -1,4 +1,7 @@
-/** A take carries no time signature, so its grid counts four beats to a bar. */
+/**
+ * A take carries no time signature, so its grid counts four beats to a bar:
+ * read only takes clicked at four beats to a bar (`beatsPerBar` 4).
+ */
 export declare const BEATS_PER_BAR = 4;
 export type TakeOptions = {
     readonly bpm: number;

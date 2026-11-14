@@ -1,12 +1,19 @@
 import { Effect, Queue, Schedule, Schema, Scope, Stream } from "effect"
-import { BEATS_PER_BAR } from "../charts/take.ts"
-import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, COUNT_IN_BEATS } from "./click.ts"
+import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, countInBeats } from "./click.ts"
 import { Session, type SessionEvent, type SessionPlan } from "./session.ts"
 import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.ts"
 
-/** `listen` opens the mic and scores each note against the click. */
+/**
+ * `bpm` counts clicks, and `beatsPerBar` is the clicks in a bar, a whole
+ * number from 1: the first of each bar is accented, and the count-in is
+ * `countInBeats(beatsPerBar)` long. A compound meter clicks its dotted beats
+ * (6/8 as 2 beats, with `Subdivision` 3 to score eighths) or every eighth
+ * (6/8 as 6 beats). `listen` opens the mic and scores each note against the
+ * click.
+ */
 export interface ClickOptions {
   readonly bpm: number
+  readonly beatsPerBar: number
   readonly listen: boolean
 }
 
@@ -31,7 +38,7 @@ export type ClickEvent =
  * the mic and emits what the session hears. Interrupting the stream stops the
  * audio and closes the mic.
  */
-export const clickTrack = ({ bpm, listen }: ClickOptions): Stream.Stream<ClickEvent> =>
+export const clickTrack = ({ bpm, beatsPerBar, listen }: ClickOptions): Stream.Stream<ClickEvent> =>
   Stream.callback<ClickEvent, AudioError>((queue) =>
     Effect.gen(function* () {
       const context = yield* Effect.acquireRelease(
@@ -44,7 +51,7 @@ export const clickTrack = ({ bpm, listen }: ClickOptions): Stream.Stream<ClickEv
         sampleRate,
         firstClick: Math.round((context.currentTime + START_DELAY_SECONDS) * sampleRate),
         framesPerBeat: (60 / bpm) * sampleRate,
-        countInBeats: COUNT_IN_BEATS,
+        countInBeats: countInBeats(beatsPerBar),
       }
       if (listen) yield* hearMic(context, plan, (event) => Queue.offerUnsafe(queue, event))
 
@@ -56,7 +63,7 @@ export const clickTrack = ({ bpm, listen }: ClickOptions): Stream.Stream<ClickEv
         for (; Session.clickFrame(plan, next) / sampleRate < horizon; next++) {
           const at = Session.clickFrame(plan, next) / sampleRate
           const gain = context.createGain()
-          gain.gain.value = CLICK_VOLUME * (next % BEATS_PER_BAR === 0 ? ACCENT_GAIN : BEAT_GAIN)
+          gain.gain.value = CLICK_VOLUME * (next % beatsPerBar === 0 ? ACCENT_GAIN : BEAT_GAIN)
           const source = context.createBufferSource()
           source.buffer = click
           source.connect(gain).connect(context.destination)
