@@ -1,3 +1,5 @@
+/** MIDI ticks in a quarter note, as alphaTab counts them (its MidiUtils.QuarterTime, which it does not export). */
+export const TICKS_PER_QUARTER = 960;
 /** The playback range of a run of bars, from the first bar's start to the last bar's end. */
 export function ticksOfBars(bars, span) {
     return { startTick: bars[span.first].start, endTick: bars[span.last].end };

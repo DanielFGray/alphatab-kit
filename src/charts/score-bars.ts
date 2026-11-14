@@ -1,3 +1,6 @@
+/** MIDI ticks in a quarter note, as alphaTab counts them (its MidiUtils.QuarterTime, which it does not export). */
+export const TICKS_PER_QUARTER = 960
+
 /** A bar's span in MIDI ticks: `start` is inclusive, `end` is where the next bar starts. */
 export type BarTicks = { readonly start: number; readonly end: number }
 

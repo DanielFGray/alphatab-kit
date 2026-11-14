@@ -1,5 +1,6 @@
 import { keyOfChords } from "./lyrics.js";
 import { noteInKey } from "./numeral.js";
+import { TICKS_PER_QUARTER } from "./score-bars.js";
 import { inferChords } from "./score-chords.js";
 import { spell } from "./spelling.js";
 /**
@@ -18,7 +19,6 @@ export function chartFromScore(score) {
         return null;
     return { text: layout(played, chords, breakLines(syllables)), key, inferred, sung: syllables.length > 0 };
 }
-const QUARTER = 960;
 /** The longest lyric line that fits a phone held upright. */
 const MAX_LINE = 48;
 /** Chord-only lines hold four bars, each `BAR_WIDTH` columns wide. */
@@ -92,7 +92,7 @@ function layout(played, chords, lines) {
         // unless it starts within a beat of the next line, where it leads that line.
         const last = line.at(-1);
         const nextStart = lines[li + 1]?.[0]?.at ?? Infinity;
-        take(Math.min(last.end + barLength(played, last.end), nextStart - QUARTER), lyric.length - sung(last, true).length);
+        take(Math.min(last.end + barLength(played, last.end), nextStart - TICKS_PER_QUARTER), lyric.length - sung(last, true).length);
         // Line start: a line's first chord, when it comes within the line's first bar, is written over
         // its first word, so a pickup word sung before the bar line still begins under its chord.
         const first = placed[0];
@@ -253,7 +253,7 @@ function playedIndexAt(played, at) {
     return Math.max(0, played.findLastIndex((p) => p.at <= at));
 }
 function barLength(played, at) {
-    return played[playedIndexAt(played, at)]?.bar.calculateDuration() ?? 4 * QUARTER;
+    return played[playedIndexAt(played, at)]?.bar.calculateDuration() ?? 4 * TICKS_PER_QUARTER;
 }
 function chordRow(chords) {
     let row = "";

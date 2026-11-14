@@ -14,6 +14,7 @@ import type { model } from "@coderline/alphatab"
 import type { MusicalKey } from "./key.ts"
 import { keyOfChords } from "./lyrics.ts"
 import { noteInKey } from "./numeral.ts"
+import { TICKS_PER_QUARTER } from "./score-bars.ts"
 import { inferChords } from "./score-chords.ts"
 import { spell } from "./spelling.ts"
 
@@ -48,7 +49,6 @@ type Played = { readonly bar: model.MasterBar; readonly at: number; readonly pas
 type ChordAt = { readonly at: number; readonly name: string }
 type Syllable = { readonly at: number; readonly end: number; readonly text: string; readonly section: boolean }
 
-const QUARTER = 960
 /** The longest lyric line that fits a phone held upright. */
 const MAX_LINE = 48
 /** Chord-only lines hold four bars, each `BAR_WIDTH` columns wide. */
@@ -124,7 +124,10 @@ function layout(
     // unless it starts within a beat of the next line, where it leads that line.
     const last = line.at(-1)!
     const nextStart = lines[li + 1]?.[0]?.at ?? Infinity
-    take(Math.min(last.end + barLength(played, last.end), nextStart - QUARTER), lyric.length - sung(last, true).length)
+    take(
+      Math.min(last.end + barLength(played, last.end), nextStart - TICKS_PER_QUARTER),
+      lyric.length - sung(last, true).length,
+    )
     // Line start: a line's first chord, when it comes within the line's first bar, is written over
     // its first word, so a pickup word sung before the bar line still begins under its chord.
     const first = placed[0]
@@ -293,7 +296,7 @@ function playedIndexAt(played: ReadonlyArray<Played>, at: number): number {
 }
 
 function barLength(played: ReadonlyArray<Played>, at: number): number {
-  return played[playedIndexAt(played, at)]?.bar.calculateDuration() ?? 4 * QUARTER
+  return played[playedIndexAt(played, at)]?.bar.calculateDuration() ?? 4 * TICKS_PER_QUARTER
 }
 
 function chordRow(chords: ReadonlyArray<{ chord: string; column: number }>): string {
