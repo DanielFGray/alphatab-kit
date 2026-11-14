@@ -8,7 +8,7 @@ import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.js"
  * the mic and emits what the session hears. Interrupting the stream stops the
  * audio and closes the mic.
  */
-export const clickTrack = ({ bpm, beatsPerBar, listen }) => Stream.callback((queue) => Effect.gen(function* () {
+export const clickTrack = ({ bpm, beatsPerBar, listen, micId }) => Stream.callback((queue) => Effect.gen(function* () {
     const context = yield* Effect.acquireRelease(Effect.sync(() => new AudioContext({ latencyHint: "interactive" })), (context) => Effect.promise(() => context.close()));
     yield* attempt("The browser would not start audio.", () => context.resume());
     const sampleRate = context.sampleRate;
@@ -19,7 +19,7 @@ export const clickTrack = ({ bpm, beatsPerBar, listen }) => Stream.callback((que
         countInBeats: countInBeats(beatsPerBar),
     };
     if (listen)
-        yield* hearMic(context, plan, (event) => Queue.offerUnsafe(queue, event));
+        yield* hearMic(context, plan, micId, (event) => Queue.offerUnsafe(queue, event));
     const click = context.createBuffer(1, clickWaveform(sampleRate).length, sampleRate);
     click.copyToChannel(clickWaveform(sampleRate), 0);
     let next = 0;
@@ -48,11 +48,21 @@ export const clickTrack = ({ bpm, beatsPerBar, listen }) => Stream.callback((que
  * clock. Emits the device name, the mic level about ten times a second, and
  * every session event. The mic closes when the scope does.
  */
-const hearMic = (context, plan, emit) => Effect.gen(function* () {
-    const mic = yield* Effect.acquireRelease(attempt("The page could not open the microphone.", () => navigator.mediaDevices.getUserMedia({
-        // The browser's echo cancelling would remove the click the session listens for.
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    })), (mic) => Effect.sync(() => mic.getTracks().forEach((track) => track.stop())));
+const hearMic = (context, plan, micId, emit) => Effect.gen(function* () {
+    const mic = yield* Effect.acquireRelease(attempt("The page could not open the microphone.", async () => {
+        // Browsers leave out mediaDevices on a page that is not secure (plain HTTP away from localhost).
+        if (navigator.mediaDevices === undefined)
+            throw new DOMException("no mediaDevices", "SecurityError");
+        return navigator.mediaDevices.getUserMedia({
+            audio: {
+                ...(micId === undefined ? {} : { deviceId: { exact: micId } }),
+                // The browser's echo cancelling would remove the click the session listens for.
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+            },
+        });
+    }), (mic) => Effect.sync(() => mic.getTracks().forEach((track) => track.stop())));
     const track = mic.getAudioTracks()[0];
     // Older Safari has no outputLatency. Only some browsers give the input
     // latency, and the DOM types do not name it yet.
@@ -113,12 +123,23 @@ const attempt = (failure, run) => Effect.tryPromise({
     catch: (cause) => new AudioError({ message: describe(failure, cause) }),
 });
 const describe = (failure, cause) => {
-    if (cause instanceof DOMException && cause.name === "NotAllowedError")
-        return "Microphone access was refused. Allow it in the browser's site settings, then start again.";
-    if (cause instanceof DOMException && cause.name === "NotFoundError")
-        return "The browser found no microphone.";
+    switch (errorName(cause)) {
+        case "NotAllowedError":
+            return "Microphone access was refused. Allow it in the browser's site settings, then start again.";
+        case "NotFoundError":
+            return "The browser found no microphone.";
+        // The only constraint that can fail is the exact deviceId: the chosen mic is gone.
+        case "OverconstrainedError":
+            return "The chosen microphone is not connected. Choose another, then start again.";
+        case "SecurityError":
+            return "The browser opens the microphone only on a secure page: HTTPS, or localhost.";
+    }
     return cause instanceof Error ? `${failure} ${cause.message}` : failure;
 };
+/** A browser error's name. Firefox's OverconstrainedError is not a DOMException, so read `name` from any object. */
+const errorName = (cause) => typeof cause === "object" && cause !== null && "name" in cause && typeof cause.name === "string"
+    ? cause.name
+    : undefined;
 const CaptureBlock = Schema.Struct({ start: Schema.Finite, samples: Schema.instanceOf(Float32Array) });
 /** Time between pressing start and the first click, so the first click is never late. */
 const START_DELAY_SECONDS = 0.3;

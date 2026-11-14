@@ -63,7 +63,11 @@ export const takeStep = (take: Take, event: ClickEvent): Take => {
  * delay places a note to the millisecond; the browser's estimate is too rough
  * to score with, so a take without a measured delay has no hits.
  */
-export const takeHits = (take: Take, bpm: number, subdivision: Subdivision): ReadonlyArray<Hit> => {
+export const takeHits = (
+  take: Pick<Take, "notesMs" | "latencyMs">,
+  bpm: number,
+  subdivision: Subdivision,
+): ReadonlyArray<Hit> => {
   const { latencyMs } = take
   if (latencyMs === null) return []
   return take.notesMs.map((atMs) => placeHit(atMs - latencyMs, 60_000 / bpm, subdivision))

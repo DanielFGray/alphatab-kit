@@ -9,12 +9,14 @@ import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.ts"
  * `countInBeats(beatsPerBar)` long. A compound meter clicks its dotted beats
  * (6/8 as 2 beats, with `Subdivision` 3 to score eighths) or every eighth
  * (6/8 as 6 beats). `listen` opens the mic and scores each note against the
- * click.
+ * click: the input whose `deviceId` is `micId`, or the browser's default
+ * without one.
  */
 export interface ClickOptions {
   readonly bpm: number
   readonly beatsPerBar: number
   readonly listen: boolean
+  readonly micId?: string
 }
 
 export type ClickEvent =
@@ -38,7 +40,7 @@ export type ClickEvent =
  * the mic and emits what the session hears. Interrupting the stream stops the
  * audio and closes the mic.
  */
-export const clickTrack = ({ bpm, beatsPerBar, listen }: ClickOptions): Stream.Stream<ClickEvent> =>
+export const clickTrack = ({ bpm, beatsPerBar, listen, micId }: ClickOptions): Stream.Stream<ClickEvent> =>
   Stream.callback<ClickEvent, AudioError>((queue) =>
     Effect.gen(function* () {
       const context = yield* Effect.acquireRelease(
@@ -53,7 +55,7 @@ export const clickTrack = ({ bpm, beatsPerBar, listen }: ClickOptions): Stream.S
         framesPerBeat: (60 / bpm) * sampleRate,
         countInBeats: countInBeats(beatsPerBar),
       }
-      if (listen) yield* hearMic(context, plan, (event) => Queue.offerUnsafe(queue, event))
+      if (listen) yield* hearMic(context, plan, micId, (event) => Queue.offerUnsafe(queue, event))
 
       const click = context.createBuffer(1, clickWaveform(sampleRate).length, sampleRate)
       click.copyToChannel(clickWaveform(sampleRate) as Float32Array<ArrayBuffer>, 0)
@@ -88,16 +90,24 @@ export const clickTrack = ({ bpm, beatsPerBar, listen }: ClickOptions): Stream.S
 const hearMic = (
   context: AudioContext,
   plan: SessionPlan,
+  micId: string | undefined,
   emit: (event: ClickEvent) => void,
 ): Effect.Effect<void, AudioError, Scope.Scope> =>
   Effect.gen(function* () {
     const mic = yield* Effect.acquireRelease(
-      attempt("The page could not open the microphone.", () =>
-        navigator.mediaDevices.getUserMedia({
-          // The browser's echo cancelling would remove the click the session listens for.
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        }),
-      ),
+      attempt("The page could not open the microphone.", async () => {
+        // Browsers leave out mediaDevices on a page that is not secure (plain HTTP away from localhost).
+        if (navigator.mediaDevices === undefined) throw new DOMException("no mediaDevices", "SecurityError")
+        return navigator.mediaDevices.getUserMedia({
+          audio: {
+            ...(micId === undefined ? {} : { deviceId: { exact: micId } }),
+            // The browser's echo cancelling would remove the click the session listens for.
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        })
+      }),
       (mic) => Effect.sync(() => mic.getTracks().forEach((track) => track.stop())),
     )
     const track = mic.getAudioTracks()[0]
@@ -159,11 +169,25 @@ const attempt = <A>(failure: string, run: () => Promise<A>) =>
   })
 
 const describe = (failure: string, cause: unknown): string => {
-  if (cause instanceof DOMException && cause.name === "NotAllowedError")
-    return "Microphone access was refused. Allow it in the browser's site settings, then start again."
-  if (cause instanceof DOMException && cause.name === "NotFoundError") return "The browser found no microphone."
+  switch (errorName(cause)) {
+    case "NotAllowedError":
+      return "Microphone access was refused. Allow it in the browser's site settings, then start again."
+    case "NotFoundError":
+      return "The browser found no microphone."
+    // The only constraint that can fail is the exact deviceId: the chosen mic is gone.
+    case "OverconstrainedError":
+      return "The chosen microphone is not connected. Choose another, then start again."
+    case "SecurityError":
+      return "The browser opens the microphone only on a secure page: HTTPS, or localhost."
+  }
   return cause instanceof Error ? `${failure} ${cause.message}` : failure
 }
+
+/** A browser error's name. Firefox's OverconstrainedError is not a DOMException, so read `name` from any object. */
+const errorName = (cause: unknown): string | undefined =>
+  typeof cause === "object" && cause !== null && "name" in cause && typeof cause.name === "string"
+    ? cause.name
+    : undefined
 
 const CaptureBlock = Schema.Struct({ start: Schema.Finite, samples: Schema.instanceOf(Float32Array) })
 

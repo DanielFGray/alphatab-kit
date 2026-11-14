@@ -6,12 +6,14 @@ import { type SessionEvent } from "./session.ts";
  * `countInBeats(beatsPerBar)` long. A compound meter clicks its dotted beats
  * (6/8 as 2 beats, with `Subdivision` 3 to score eighths) or every eighth
  * (6/8 as 6 beats). `listen` opens the mic and scores each note against the
- * click.
+ * click: the input whose `deviceId` is `micId`, or the browser's default
+ * without one.
  */
 export interface ClickOptions {
     readonly bpm: number;
     readonly beatsPerBar: number;
     readonly listen: boolean;
+    readonly micId?: string;
 }
 export type ClickEvent = SessionEvent
 /** A click is sounding now. Beat 0 is the first click of the count-in. */
@@ -44,4 +46,4 @@ export type ClickEvent = SessionEvent
  * the mic and emits what the session hears. Interrupting the stream stops the
  * audio and closes the mic.
  */
-export declare const clickTrack: ({ bpm, beatsPerBar, listen }: ClickOptions) => Stream.Stream<ClickEvent>;
+export declare const clickTrack: ({ bpm, beatsPerBar, listen, micId }: ClickOptions) => Stream.Stream<ClickEvent>;
