@@ -1,8 +1,7 @@
 # gigbag.js
 
-Browser music notation for dfg.codes, dfg.rocks and setlist: alphaTab scores and playback (Vite plugin, patch, React parts), and chord charts under `charts/` (ChordPro documents, transposition, voicings, numerals, phrases, recorded takes).
+What the kit holds, and how apps install it: README.md.
 
-- Apps install the kit as a git dependency on a tag (`"gigbag.js": "git+…#vX.Y.Z"`), so container builds see it like any other package. For local work across both repos, `bun link gigbag.js` (without `--save`) in the app replaces the installed copy with a symlink until the next install.
 - `dist/` is committed: apps do not build the kit on install, and Node cannot load TypeScript from `node_modules` when Vite loads `vite.config.ts`. Run `bun run build` before each commit; `src/dist.test.ts` fails when `dist/` is stale.
 - Commands: `bun test`, `bun run typecheck`, `bun run lint`, `bun run build`, and `bun fmt` (the [fmt] section in bunfig.toml; `bun fmt --check` must pass before each commit). `prepare` re-patches `tsc` and `oxlint` after every install.
 
