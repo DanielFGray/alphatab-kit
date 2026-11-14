@@ -1,0 +1,7 @@
+# Build output: src/dist.test.ts compares it with a fresh build.
+dist/
+# alphaTab patches and test fixtures must stay byte for byte.
+patches/
+test/fixtures/
+# Generated data.
+src/charts/rock-prior.json

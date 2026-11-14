@@ -66,8 +66,7 @@ export function barEdgeBeat(beats, currentIndex, edge) {
         }
     }
     else {
-        while (index < beats.length - 1 &&
-            beats[index + 1]?.masterBarIndex === currentBeat.masterBarIndex) {
+        while (index < beats.length - 1 && beats[index + 1]?.masterBarIndex === currentBeat.masterBarIndex) {
             index += 1;
         }
     }

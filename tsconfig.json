@@ -2,11 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "lib": [
-      "ESNext",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
@@ -19,16 +15,9 @@
         "name": "@effect/language-service"
       }
     ],
-    "types": [
-      "bun",
-      "node"
-    ],
+    "types": ["bun", "node"],
     "resolveJsonModule": true
   },
-  "include": [
-    "src",
-    "scripts",
-    "test"
-  ],
+  "include": ["src", "scripts", "test"],
   "$schema": "./node_modules/@effect/tsgo/schema.json"
 }

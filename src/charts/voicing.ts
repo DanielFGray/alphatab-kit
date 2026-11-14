@@ -59,7 +59,13 @@ function scoreOf(frets: Voicing["frets"], chord: Spelling, tuning: ReadonlyArray
   const interiorMutes = sounding.length === 0 ? 0 : sounding.at(-1)! - sounding[0]! + 1 - sounding.length
   const unisons = pitches.length - new Set(pitches).size
   return (
-    4 * interiorMutes + 2 * optionalMissing + fingersNeeded(frets) + 2 * span + 2 * lowest + 6 * unisons - 1.5 * sounding.length
+    4 * interiorMutes +
+    2 * optionalMissing +
+    fingersNeeded(frets) +
+    2 * span +
+    2 * lowest +
+    6 * unisons -
+    1.5 * sounding.length
   )
 }
 
@@ -92,7 +98,12 @@ function shapesIn(chord: Spelling, tuning: ReadonlyArray<number>, start: number)
 }
 
 /** The rules the window search does not already guarantee. */
-function playable(frets: Voicing["frets"], chord: Spelling, tuning: ReadonlyArray<number>, fewestStrings: number): boolean {
+function playable(
+  frets: Voicing["frets"],
+  chord: Spelling,
+  tuning: ReadonlyArray<number>,
+  fewestStrings: number,
+): boolean {
   const sounding = soundingStrings(frets)
   if (sounding.length < fewestStrings) return false
   const pitches = sounding.map((i) => tuning[i]! + frets[i]!)

@@ -10,7 +10,9 @@ export function ticksOfBars(bars: ReadonlyArray<BarTicks>, span: BarSpan): { sta
 }
 
 /** Each master bar's span in ticks, from alphaTab's model. */
-export function barTicksOf(masterBars: ReadonlyArray<{ readonly start: number; calculateDuration(): number }>): Array<BarTicks> {
+export function barTicksOf(
+  masterBars: ReadonlyArray<{ readonly start: number; calculateDuration(): number }>,
+): Array<BarTicks> {
   return masterBars.map((bar) => ({ start: bar.start, end: bar.start + bar.calculateDuration() }))
 }
 
@@ -53,7 +55,10 @@ export type BeatSpan = { readonly first: BeatPlace; readonly last: BeatPlace }
 /** The part of alphaTab's beat model a selection reads. */
 type BeatLike = {
   readonly index: number
-  readonly voice: { readonly beats: ReadonlyArray<unknown>; readonly bar: { readonly masterBar: { readonly index: number } } }
+  readonly voice: {
+    readonly beats: ReadonlyArray<unknown>
+    readonly bar: { readonly masterBar: { readonly index: number } }
+  }
 }
 
 /** The span from a selection's first beat to its last. The beat count is what tells the last beat of a bar from a middle one. */

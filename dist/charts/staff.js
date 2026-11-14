@@ -43,7 +43,7 @@ export function staffSides(steps) {
 function toneNote(spelling, degree, semitones) {
     const letter = letterAbove(spelling.rootLetter, degree - 1);
     const octave = 4 + Math.floor((indexOf(spelling.rootLetter) + (degree - 1)) / 7);
-    const pitchClass = ((spelling.root + semitones) % 12 + 12) % 12;
+    const pitchClass = (((spelling.root + semitones) % 12) + 12) % 12;
     return { letter, accidental: accidentalOf(pitchClass, letter), octave, degree };
 }
 function bassNote(spelling) {
@@ -56,7 +56,7 @@ function bassNote(spelling) {
         octave -= 1;
     let degree = null;
     for (const [candidate, semitones] of spelling.tones) {
-        const pitchClass = ((spelling.root + semitones) % 12 + 12) % 12;
+        const pitchClass = (((spelling.root + semitones) % 12) + 12) % 12;
         if (pitchClass === spelling.bass && (degree === null || candidate < degree))
             degree = candidate;
     }

@@ -7,7 +7,10 @@ const apply = (units: ReadonlyArray<string>, changes: ReadonlyArray<Change>): Ar
   const out: Array<string> = []
   let at = 0
   for (const c of changes) {
-    out.push(...units.slice(at, c.from), ...(c.source === undefined ? Array<string>(c.insert).fill("+") : units.slice(c.source, c.source + c.insert)))
+    out.push(
+      ...units.slice(at, c.from),
+      ...(c.source === undefined ? Array<string>(c.insert).fill("+") : units.slice(c.source, c.source + c.insert)),
+    )
     at = c.to
   }
   return [...out, ...units.slice(at)]
@@ -25,12 +28,17 @@ describe("composeChanges", () => {
   })
 
   test("merges a delete and an insert that touch", () => {
-    expect(composeChanges([{ from: 2, to: 4, insert: 0 }], [{ from: 2, to: 2, insert: 5 }])).toEqual([{ from: 2, to: 4, insert: 5 }])
+    expect(composeChanges([{ from: 2, to: 4, insert: 0 }], [{ from: 2, to: 2, insert: 5 }])).toEqual([
+      { from: 2, to: 4, insert: 5 },
+    ])
   })
 
   test("keeps a move whose source is not where it lands", () => {
     const units = ["a", "b", "c", "d", "e", "f"]
-    const move = [{ from: 0, to: 0, insert: 2, source: 4 }, { from: 4, to: 6, insert: 0 }]
+    const move = [
+      { from: 0, to: 0, insert: 2, source: 4 },
+      { from: 4, to: 6, insert: 0 },
+    ]
     expect(isChangeSet(move)).toBe(true)
     expect(apply(units, composeChanges([], move))).toEqual(["e", "f", "a", "b", "c", "d"])
     expect(mapRange({ start: 4, end: 5 }, composeChanges([], move))).toEqual({ start: 0, end: 1 })
@@ -39,29 +47,52 @@ describe("composeChanges", () => {
   test("keeps a move made after an earlier edit", () => {
     const units = ["a", "b", "c", "d", "e", "f"]
     const first = [{ from: 0, to: 0, insert: 1 }]
-    const second = [{ from: 0, to: 0, insert: 2, source: 5 }, { from: 5, to: 7, insert: 0 }]
+    const second = [
+      { from: 0, to: 0, insert: 2, source: 5 },
+      { from: 5, to: 7, insert: 0 },
+    ]
     const composed = composeChanges(first, second)
     expect(apply(units, composed)).toEqual(apply(apply(units, first), second))
     expect(mapRange({ start: 4, end: 5 }, composed)).toEqual({ start: 0, end: 1 })
   })
 
   test("a move undone leaves no change", () => {
-    const down = [{ from: 0, to: 2, insert: 0 }, { from: 4, to: 4, insert: 2, source: 0 }]
-    const up = [{ from: 0, to: 0, insert: 2, source: 2 }, { from: 2, to: 4, insert: 0 }]
+    const down = [
+      { from: 0, to: 2, insert: 0 },
+      { from: 4, to: 4, insert: 2, source: 0 },
+    ]
+    const up = [
+      { from: 0, to: 0, insert: 2, source: 2 },
+      { from: 2, to: 4, insert: 0 },
+    ]
     expect(composeChanges(down, up)).toEqual([])
   })
 
   test("two moves in a row keep every unit's place", () => {
     const units = ["a", "b", "c", "d", "e", "f", "g", "h"]
-    const first = [{ from: 2, to: 4, insert: 0 }, { from: 6, to: 6, insert: 2, source: 2 }]
-    const second = [{ from: 0, to: 0, insert: 2, source: 4 }, { from: 4, to: 6, insert: 0 }]
+    const first = [
+      { from: 2, to: 4, insert: 0 },
+      { from: 6, to: 6, insert: 2, source: 2 },
+    ]
+    const second = [
+      { from: 0, to: 0, insert: 2, source: 4 },
+      { from: 4, to: 6, insert: 0 },
+    ]
     const composed = composeChanges(first, second)
     expect(isChangeSet(composed)).toBe(true)
     expect(apply(units, composed)).toEqual(apply(apply(units, first), second))
   })
 
   test("keeps an untouched part of a moved insertion", () => {
-    expect(composeChanges([{ from: 2, to: 5, insert: 0 }, { from: 6, to: 6, insert: 3, source: 2 }], [{ from: 4, to: 4, insert: 1 }])).toEqual([
+    expect(
+      composeChanges(
+        [
+          { from: 2, to: 5, insert: 0 },
+          { from: 6, to: 6, insert: 3, source: 2 },
+        ],
+        [{ from: 4, to: 4, insert: 1 }],
+      ),
+    ).toEqual([
       { from: 2, to: 5, insert: 0 },
       { from: 6, to: 6, insert: 1, source: 2 },
       { from: 6, to: 6, insert: 1 },
@@ -70,19 +101,34 @@ describe("composeChanges", () => {
   })
 
   test("rejects copied, overlapping, and empty source ranges", () => {
-    expect(isChangeSet([{ from: 0, to: 0, insert: 2, source: 1 }, { from: 1, to: 3, insert: 0 }, { from: 4, to: 4, insert: 2, source: 1 }])).toBe(false)
-    expect(isChangeSet([{ from: 0, to: 2, insert: 0 }, { from: 3, to: 4, insert: 0, source: 0 }])).toBe(false)
+    expect(
+      isChangeSet([
+        { from: 0, to: 0, insert: 2, source: 1 },
+        { from: 1, to: 3, insert: 0 },
+        { from: 4, to: 4, insert: 2, source: 1 },
+      ]),
+    ).toBe(false)
+    expect(
+      isChangeSet([
+        { from: 0, to: 2, insert: 0 },
+        { from: 3, to: 4, insert: 0, source: 0 },
+      ]),
+    ).toBe(false)
   })
 
   test("explains checks the anchor text named by a move", () => {
-    expect(explains("abcdef", "adefbc", [
-      { from: 1, to: 3, insert: 0 },
-      { from: 6, to: 6, insert: 2, source: 1 },
-    ])).toBe(true)
-    expect(explains("abcdef", "adefXY", [
-      { from: 1, to: 3, insert: 0 },
-      { from: 6, to: 6, insert: 2, source: 1 },
-    ])).toBe(false)
+    expect(
+      explains("abcdef", "adefbc", [
+        { from: 1, to: 3, insert: 0 },
+        { from: 6, to: 6, insert: 2, source: 1 },
+      ]),
+    ).toBe(true)
+    expect(
+      explains("abcdef", "adefXY", [
+        { from: 1, to: 3, insert: 0 },
+        { from: 6, to: 6, insert: 2, source: 1 },
+      ]),
+    ).toBe(false)
   })
 
   test("every unit keeps its place through composed inserts, deletes and moves", () => {
@@ -110,7 +156,11 @@ describe("composeChanges", () => {
         const mapped = mapRange({ start: i, end: i + 1 }, composed)
         if (at >= 0) expect(mapped, `seed ${seed}, unit ${label}`).toEqual({ start: at, end: at + 1 })
         // A deleted unit's mark is lost, or lands on the text that replaced it, and never on another original unit.
-        else if (mapped !== null) expect(units.slice(mapped.start, mapped.end).every((unit) => unit === "+"), `seed ${seed}, unit ${label}`).toBe(true)
+        else if (mapped !== null)
+          expect(
+            units.slice(mapped.start, mapped.end).every((unit) => unit === "+"),
+            `seed ${seed}, unit ${label}`,
+          ).toBe(true)
       })
     }
   })
@@ -162,6 +212,12 @@ function randomStep(length: number, random: (n: number) => number): Array<Change
   const destination = random(length + 1 - insert)
   const at = destination <= from ? destination : destination + insert
   return at <= from
-    ? [{ from: at, to: at, insert, source: from }, { from, to, insert: 0 }]
-    : [{ from, to, insert: 0 }, { from: at, to: at, insert, source: from }]
+    ? [
+        { from: at, to: at, insert, source: from },
+        { from, to, insert: 0 },
+      ]
+    : [
+        { from, to, insert: 0 },
+        { from: at, to: at, insert, source: from },
+      ]
 }

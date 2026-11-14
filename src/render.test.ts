@@ -24,8 +24,9 @@ test("line breaks follow the width", async () => {
 
 test("staticScoreHtml stacks one view box per part, together covering the whole score", async () => {
   const score = await render(long, 600)
-  const boxes = [...staticScoreHtml(score).matchAll(/class="at-static-part"[^>]*viewBox="0 ([\d.]+) 600 ([\d.]+)"/g)]
-    .map(([, top, height]) => [Number(top), Number(height)] as const)
+  const boxes = [
+    ...staticScoreHtml(score).matchAll(/class="at-static-part"[^>]*viewBox="0 ([\d.]+) 600 ([\d.]+)"/g),
+  ].map(([, top, height]) => [Number(top), Number(height)] as const)
   expect(boxes.length).toBe(score.parts.length)
   expect(boxes[0]![0]).toBe(0)
   boxes.slice(1).forEach(([top], i) => expect(top).toBeCloseTo(boxes[i]![0] + boxes[i]![1]))
@@ -48,8 +49,6 @@ test("bytes that are no score fail with ScoreLoadError", async () => {
 })
 
 test("a render alphaTab skips fails with ScoreRenderError instead of waiting", async () => {
-  const error = await Effect.runPromise(
-    renderScoreSvg({ _tag: "AlphaTex", tex }, { width: 0 }).pipe(Effect.flip),
-  )
+  const error = await Effect.runPromise(renderScoreSvg({ _tag: "AlphaTex", tex }, { width: 0 }).pipe(Effect.flip))
   expect(error._tag).toBe("ScoreRenderError")
 })

@@ -67,7 +67,10 @@ export function near(a: Box, b: Box, gap: number): boolean {
  * for pixel input, so `points` are in px and `em` is the chart's font size.
  */
 export function inkPath(points: Stroke, em: number): string {
-  const outline = getStroke(points.map((p) => [...p]), { size: 0.16 * em, thinning: 0.6, smoothing: 0.5, streamline: 0.4 })
+  const outline = getStroke(
+    points.map((p) => [...p]),
+    { size: 0.16 * em, thinning: 0.6, smoothing: 0.5, streamline: 0.4 },
+  )
   if (outline.length === 0) return ""
   return `M ${outline.map(([x, y]) => `${x!.toFixed(3)} ${y!.toFixed(3)}`).join(" L ")} Z`
 }

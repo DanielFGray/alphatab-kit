@@ -82,7 +82,7 @@ export function segments(line) {
     const breaks = [...starts].sort((a, b) => a - b);
     return breaks.map((start, i) => {
         const end = breaks[i + 1] ?? line.text.length;
-        const chords = line.chords.flatMap((c, index) => (c.at >= start && (c.at < end || (i === breaks.length - 1 && c.at === end)) ? [index] : []));
+        const chords = line.chords.flatMap((c, index) => c.at >= start && (c.at < end || (i === breaks.length - 1 && c.at === end)) ? [index] : []);
         return { start, end, chords };
     });
 }
@@ -161,13 +161,20 @@ export function editLine(doc, lineIndex, text) {
     // with the text after it; a chord on text being replaced stays at its start.
     const chords = line.chords.map((c) => ({
         ...c,
-        at: c.at < keep.prefix || (c.at === keep.prefix && replacedEnd > keep.prefix) ? c.at : c.at >= replacedEnd ? c.at + shift : keep.prefix,
+        at: c.at < keep.prefix || (c.at === keep.prefix && replacedEnd > keep.prefix)
+            ? c.at
+            : c.at >= replacedEnd
+                ? c.at + shift
+                : keep.prefix,
     }));
     const next = { ...line, text, chords };
     const edited = replaceLine(doc, lineIndex, next);
     const [change] = commonEnds(anchorLine(line), anchorLine(next)).change;
     const base = lineStart(doc, lineIndex);
-    return { doc: edited, changes: change ? [{ from: base + change.from, to: base + change.to, insert: change.insert }] : [] };
+    return {
+        doc: edited,
+        changes: change ? [{ from: base + change.from, to: base + change.to, insert: change.insert }] : [],
+    };
 }
 /** Adds an empty lyric line after `lineIndex`. */
 export function insertLineAfter(doc, lineIndex) {
@@ -483,7 +490,10 @@ function removeLineAt(doc, index) {
     const length = anchorLine(doc[index]).length;
     // The chart never holds no lines: removing the last one leaves an empty lyric line, which is what "" parses to.
     if (doc.length === 1) {
-        return { doc: [{ kind: "lyrics", text: "", chords: [] }], changes: length > 0 ? [{ from: 0, to: length, insert: 0 }] : [] };
+        return {
+            doc: [{ kind: "lyrics", text: "", chords: [] }],
+            changes: length > 0 ? [{ from: 0, to: length, insert: 0 }] : [],
+        };
     }
     const next = doc.filter((_, i) => i !== index);
     const start = lineStart(doc, index);

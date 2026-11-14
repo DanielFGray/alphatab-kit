@@ -63,10 +63,21 @@ export function wordsFromTesseract(tsv) {
  */
 export function wordsFromPdf(xhtml) {
     const words = [];
-    for (const [index, page] of xhtml.split(/<page\b/).slice(1).entries()) {
+    for (const [index, page] of xhtml
+        .split(/<page\b/)
+        .slice(1)
+        .entries()) {
         const lines = [];
-        const boxes = [...page.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g)]
-            .map((m) => ({ text: decodeXml(m[5]).trim(), left: Number(m[1]), top: Number(m[2]), right: Number(m[3]), bottom: Number(m[4]) }))
+        const boxes = [
+            ...page.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g),
+        ]
+            .map((m) => ({
+            text: decodeXml(m[5]).trim(),
+            left: Number(m[1]),
+            top: Number(m[2]),
+            right: Number(m[3]),
+            bottom: Number(m[4]),
+        }))
             .filter((box) => box.text !== "");
         for (const box of boxes.toSorted((a, b) => a.top - b.top)) {
             const middle = (box.top + box.bottom) / 2;
@@ -159,7 +170,9 @@ function fixLyricWord(word) {
     return word === "|" ? "I" : word;
 }
 function decodeXml(text) {
-    return text.replace(/&(amp|lt|gt|quot|apos|#\d+);/g, (_, name) => name.startsWith("#") ? String.fromCodePoint(Number(name.slice(1))) : { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name]);
+    return text.replace(/&(amp|lt|gt|quot|apos|#\d+);/g, (_, name) => name.startsWith("#")
+        ? String.fromCodePoint(Number(name.slice(1)))
+        : { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name]);
 }
 function median(values) {
     if (values.length === 0)

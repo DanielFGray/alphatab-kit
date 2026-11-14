@@ -54,7 +54,11 @@ export function inferChords(
  * Sevenths, sus chords and maj7 are not tried: melody notes made them win on
  * plain chords. Each quality costs a little for being less plain than a triad.
  */
-const QUALITIES: ReadonlyArray<readonly [Quality, number]> = [["", 0], ["m", 0], ["5", 0.02]]
+const QUALITIES: ReadonlyArray<readonly [Quality, number]> = [
+  ["", 0],
+  ["m", 0],
+  ["5", 0.02],
+]
 
 const TEMPLATES = Array.from({ length: 12 }, (_, root) =>
   QUALITIES.map(([quality, cost]) => {
@@ -97,7 +101,9 @@ function heard(score: model.Score, barIndex: number, from: number, to: number): 
 /** Every beat of a bar on every staff that is not drums. */
 function pitchedBeats(score: model.Score, barIndex: number): Array<model.Beat> {
   return score.tracks.flatMap((track) =>
-    track.staves.filter((staff) => !staff.isPercussion).flatMap((staff) => staff.bars[barIndex]?.voices.flatMap((voice) => voice.beats) ?? []),
+    track.staves
+      .filter((staff) => !staff.isPercussion)
+      .flatMap((staff) => staff.bars[barIndex]?.voices.flatMap((voice) => voice.beats) ?? []),
   )
 }
 

@@ -31,7 +31,11 @@ export function inferChords(score, played) {
  * Sevenths, sus chords and maj7 are not tried: melody notes made them win on
  * plain chords. Each quality costs a little for being less plain than a triad.
  */
-const QUALITIES = [["", 0], ["m", 0], ["5", 0.02]];
+const QUALITIES = [
+    ["", 0],
+    ["m", 0],
+    ["5", 0.02],
+];
 const TEMPLATES = Array.from({ length: 12 }, (_, root) => QUALITIES.map(([quality, cost]) => {
     // Any spelling of the root gives the same pitch classes.
     const s = spell(["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][root] + quality);
@@ -66,7 +70,9 @@ function heard(score, barIndex, from, to) {
 }
 /** Every beat of a bar on every staff that is not drums. */
 function pitchedBeats(score, barIndex) {
-    return score.tracks.flatMap((track) => track.staves.filter((staff) => !staff.isPercussion).flatMap((staff) => staff.bars[barIndex]?.voices.flatMap((voice) => voice.beats) ?? []));
+    return score.tracks.flatMap((track) => track.staves
+        .filter((staff) => !staff.isPercussion)
+        .flatMap((staff) => staff.bars[barIndex]?.voices.flatMap((voice) => voice.beats) ?? []));
 }
 /** The best-scoring chord for what was heard; `fit` is its score as a share of the sound. */
 function bestChord(h) {

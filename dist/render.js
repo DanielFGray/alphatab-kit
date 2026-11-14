@@ -65,7 +65,12 @@ const draw = (score, settings, options) => {
         onSome: Effect.fail,
         onNone: () => Option.match(size, {
             onNone: () => Effect.fail(new ScoreRenderError({ message: `alphaTab drew nothing at width ${options.width}` })),
-            onSome: ({ width, height }) => Effect.succeed({ width, height, musicFontSize: settings.display.resources.engravingSettings.musicFontSize, parts }),
+            onSome: ({ width, height }) => Effect.succeed({
+                width,
+                height,
+                musicFontSize: settings.display.resources.engravingSettings.musicFontSize,
+                parts,
+            }),
         }),
     });
 };

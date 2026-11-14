@@ -32,7 +32,11 @@ describe("suggest", () => {
       return chords([...likely, ...fresh])
     }
     const roots = (key: string) =>
-      new Set(every({ key, before: [key], after: [] }).filter((chord) => !chord.includes("dim")).map((chord) => chord.match(/^[A-G][#b]?/)![0]))
+      new Set(
+        every({ key, before: [key], after: [] })
+          .filter((chord) => !chord.includes("dim"))
+          .map((chord) => chord.match(/^[A-G][#b]?/)![0]),
+      )
     // Every degree of the key, by the letter it sits on: bVI in G is Eb, bII in Bb is Cb, which players write B.
     expect(roots("G")).toEqual(new Set(["G", "Ab", "A", "Bb", "B", "C", "C#", "D", "Eb", "E", "F", "F#"]))
     expect(roots("Bb")).toEqual(new Set(["Bb", "B", "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A"]))

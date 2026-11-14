@@ -61,7 +61,20 @@ export function inKey(spelling, scale) {
     return [...spelling.tones.values()].every((semitones) => scale.pitches.has((spelling.root + semitones) % 12));
 }
 /** Roman numeral names for each semitone above the tonic. */
-export const DEGREE_NAME = ["I", "bII", "II", "bIII", "III", "IV", "#IV", "V", "bVI", "VI", "bVII", "VII"];
+export const DEGREE_NAME = [
+    "I",
+    "bII",
+    "II",
+    "bIII",
+    "III",
+    "IV",
+    "#IV",
+    "V",
+    "bVI",
+    "VI",
+    "bVII",
+    "VII",
+];
 /** Letters above the tonic's letter for each numeral. */
 export const ROMAN_STEP = { I: 0, II: 1, III: 2, IV: 3, V: 4, VI: 5, VII: 6 };
 /** The note at `pitch` as the key spells its degree (`DEGREE_NAME`): Db in Ab, A# in E, Bb in C. */

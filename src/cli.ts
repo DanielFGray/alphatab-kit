@@ -39,7 +39,9 @@ export async function syncPatch(appDir: string, { check }: { check: boolean }): 
   const wanted = await readFile(source, "utf8")
   const current = await readFile(target, "utf8").catch(() => undefined)
 
-  const stale = Object.keys(pkg.patchedDependencies ?? {}).filter((k) => k.startsWith(`${ALPHATAB_PACKAGE}@`) && k !== key)
+  const stale = Object.keys(pkg.patchedDependencies ?? {}).filter(
+    (k) => k.startsWith(`${ALPHATAB_PACKAGE}@`) && k !== key,
+  )
   const field = pkg.dependencies?.[ALPHATAB_PACKAGE] !== undefined ? "dependencies" : "devDependencies"
   const problems = [
     ...(current === wanted ? [] : [`${relative} differs from the kit's patch`]),

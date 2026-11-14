@@ -23,7 +23,8 @@ describe("spell", () => {
     expect(spell("CΔ")).toMatchObject({ root: 0, bass: 0, required: [0, 4, 11], optional: [7] })
     // Minor-major 7th, in the spellings charts use.
     const minorMajor = { root: 0, bass: 0, required: [0, 3, 11], optional: [7] }
-    for (const name of ["Cm(maj7)", "CmMaj7", "CmM7", "Cmmaj7", "C-Δ"]) expect(spell(name), name).toMatchObject(minorMajor)
+    for (const name of ["Cm(maj7)", "CmMaj7", "CmM7", "Cmmaj7", "C-Δ"])
+      expect(spell(name), name).toMatchObject(minorMajor)
   })
 
   test("a `+` or `-` before a tone is an alteration of that tone", () => {

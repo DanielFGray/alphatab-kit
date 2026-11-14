@@ -25,10 +25,19 @@ const FOLDS = 5
 const runs = corpusRuns(readCorpus(dir))
 const songs = [...new Set(runs.map((run) => run.song))]
 const foldOf = (song: string) => songs.indexOf(song) % FOLDS
-const priors: ReadonlyArray<Prior> = Array.from({ length: FOLDS }, (_, fold) => priorFrom(runs.filter((run) => foldOf(run.song) !== fold)))
+const priors: ReadonlyArray<Prior> = Array.from({ length: FOLDS }, (_, fold) =>
+  priorFrom(runs.filter((run) => foldOf(run.song) !== fold)),
+)
 
 /** One hidden chord: the classes before and after it, and the class to find. */
-type Case = { fold: number; key: string; before: ReadonlyArray<string>; after: ReadonlyArray<string>; hidden: string; names: ReadonlyArray<string> }
+type Case = {
+  fold: number
+  key: string
+  before: ReadonlyArray<string>
+  after: ReadonlyArray<string>
+  hidden: string
+  names: ReadonlyArray<string>
+}
 
 // One analyst's reading per song, so a song is not counted twice.
 const tested = runs.filter((run) => run.analyst === "dt")
@@ -41,7 +50,10 @@ const cases = (setting: "between" | "writing"): ReadonlyArray<Case> =>
       if (index === 0) return []
       const before = classes.slice(0, index)
       const after = setting === "between" ? classes.slice(index + 1) : []
-      const known = setting === "between" ? [...run.chords.slice(0, index), ...run.chords.slice(index + 1)] : run.chords.slice(0, index)
+      const known =
+        setting === "between"
+          ? [...run.chords.slice(0, index), ...run.chords.slice(index + 1)]
+          : run.chords.slice(0, index)
       return [{ fold: foldOf(run.song), key: run.key, before, after, hidden, names: known }]
     })
   })
@@ -58,7 +70,9 @@ function score(all: ReadonlyArray<Case>, rank: (item: Case) => ReadonlyArray<str
   return { top1: top1 / all.length, top3: top3 / all.length }
 }
 
-const unique = (classes: ReadonlyArray<string | null>) => [...new Set(classes.filter((cls): cls is string => cls !== null))]
+const unique = (classes: ReadonlyArray<string | null>) => [
+  ...new Set(classes.filter((cls): cls is string => cls !== null)),
+]
 const palette = (item: Case) => {
   const scale = keyScale(item.key)!
   return unique([...suggestedChords(item.key), ...item.names].map((chord) => chordClass(chord, scale)))
@@ -68,7 +82,8 @@ const mostUsed = (item: Case) => {
   for (const cls of [...item.before, ...item.after]) counts.set(cls, (counts.get(cls) ?? 0) + 1)
   return [...counts].sort((a, b) => b[1] - a[1]).map(([cls]) => cls)
 }
-const model = (weights: typeof WEIGHTS) => (item: Case) => rankClasses(item.before, item.after, priors[item.fold]!, weights)
+const model = (weights: typeof WEIGHTS) => (item: Case) =>
+  rankClasses(item.before, item.after, priors[item.fold]!, weights)
 
 const percent = (value: number) => `${(100 * value).toFixed(1)}%`.padStart(6)
 const settings = { between: cases("between"), writing: cases("writing") }
@@ -81,7 +96,10 @@ for (const [setting, all] of [...Object.entries(settings), ["new chord", fresh] 
     // Pseudo-counts this large drown the song's counts, leaving the corpus layer.
     ["corpus only (no song layer)", model({ song: 1e9, corpus: WEIGHTS.corpus, trigram: 1e9 })],
     ["model", model(WEIGHTS)],
-    ["model, new to the song only", (item: Case) => model(WEIGHTS)(item).filter((cls) => !item.before.includes(cls) && !item.after.includes(cls))],
+    [
+      "model, new to the song only",
+      (item: Case) => model(WEIGHTS)(item).filter((cls) => !item.before.includes(cls) && !item.after.includes(cls)),
+    ],
   ] as const) {
     const { top1, top3 } = score(all, rank)
     console.log(`  ${name.padEnd(30)} top-1 ${percent(top1)}  top-3 ${percent(top3)}`)
@@ -97,5 +115,6 @@ if (process.argv.includes("--fit")) {
       for (const trigram of [0.25, 1, 4])
         fits.push([JSON.stringify({ song, corpus, trigram }), score(all, model({ song, corpus, trigram })).top3])
   console.log("\nbest weights by top-3 over both settings:")
-  for (const [weights, top3] of fits.sort((a, b) => b[1] - a[1]).slice(0, 5)) console.log(`  ${weights} ${percent(top3)}`)
+  for (const [weights, top3] of fits.sort((a, b) => b[1] - a[1]).slice(0, 5))
+    console.log(`  ${weights} ${percent(top3)}`)
 }

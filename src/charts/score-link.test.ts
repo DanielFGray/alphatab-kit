@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test"
-import { drawnRange, excerpt, formatScoreLink, readScoreLink, sectionChoices, type ExcerptBar, type ScoreLink, type ScoreOutline } from "./score-link.ts"
+import {
+  drawnRange,
+  excerpt,
+  formatScoreLink,
+  readScoreLink,
+  sectionChoices,
+  type ExcerptBar,
+  type ScoreLink,
+  type ScoreOutline,
+} from "./score-link.ts"
 
 const outline: ScoreOutline = {
   tracks: ["Lead Gtr", "Bass"],
@@ -30,16 +39,24 @@ describe("readScoreLink", () => {
   it("names what is missing or given twice", () => {
     expect(readScoreLink(`track="Bass" bars=5-8`)).toEqual({ problem: "The score link names no chart" })
     expect(readScoreLink(`chart=abc bars=5-8`)).toEqual({ problem: "The score link names no track" })
-    expect(readScoreLink(`chart=abc track="Bass"`)).toEqual({ problem: "The score link needs a section or bars, not both" })
+    expect(readScoreLink(`chart=abc track="Bass"`)).toEqual({
+      problem: "The score link needs a section or bars, not both",
+    })
     expect(readScoreLink(`chart=abc track="Bass" section="A" bars=1-2`)).toEqual({
       problem: "The score link needs a section or bars, not both",
     })
   })
 
   it("rejects a bar range that is not a range of bars", () => {
-    expect(readScoreLink(`chart=abc track="Bass" bars=5`)).toEqual({ problem: `The bars "5" are not a range such as 5-8` })
-    expect(readScoreLink(`chart=abc track="Bass" bars=8-5`)).toEqual({ problem: "The bars 8-5 are not a range of bars" })
-    expect(readScoreLink(`chart=abc track="Bass" bars=0-2`)).toEqual({ problem: "The bars 0-2 are not a range of bars" })
+    expect(readScoreLink(`chart=abc track="Bass" bars=5`)).toEqual({
+      problem: `The bars "5" are not a range such as 5-8`,
+    })
+    expect(readScoreLink(`chart=abc track="Bass" bars=8-5`)).toEqual({
+      problem: "The bars 8-5 are not a range of bars",
+    })
+    expect(readScoreLink(`chart=abc track="Bass" bars=0-2`)).toEqual({
+      problem: "The bars 0-2 are not a range of bars",
+    })
   })
 })
 
@@ -69,15 +86,27 @@ describe("drawnRange", () => {
   })
 
   it("says what is missing: a track, a section, or bars past the end", () => {
-    expect(drawnRange(link({ section: "Chorus" }, "Drums"), outline)).toEqual({ problem: `No track named "Drums" in this score` })
+    expect(drawnRange(link({ section: "Chorus" }, "Drums"), outline)).toEqual({
+      problem: `No track named "Drums" in this score`,
+    })
     expect(drawnRange(link({ section: "Bridge" }), outline)).toEqual({ problem: `No section "Bridge" in this score` })
-    expect(drawnRange(link({ from: 7, to: 9 }), outline)).toEqual({ problem: "The bars 7-9 run past the score's 8 bars" })
+    expect(drawnRange(link({ from: 7, to: 9 }), outline)).toEqual({
+      problem: "The bars 7-9 run past the score's 8 bars",
+    })
   })
 })
 
 describe("sectionChoices", () => {
   it("gives each section its bars and flags a marker that two sections share", () => {
-    const shared: ScoreOutline = { tracks: ["Lead Gtr"], sections: [{ index: 0, marker: "Verse" }, { index: 4, marker: "Chorus" }, { index: 6, marker: "Verse" }], bars: 8 }
+    const shared: ScoreOutline = {
+      tracks: ["Lead Gtr"],
+      sections: [
+        { index: 0, marker: "Verse" },
+        { index: 4, marker: "Chorus" },
+        { index: 6, marker: "Verse" },
+      ],
+      bars: 8,
+    }
     expect(sectionChoices(shared)).toEqual([
       { marker: "Verse", first: 0, last: 3, repeated: true },
       { marker: "Chorus", first: 4, last: 5, repeated: false },

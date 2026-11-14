@@ -30,7 +30,16 @@ export function renderLyrics(source, shownKey) {
     const closePhrase = () => {
         if (!phrase)
             return;
-        lines.push([{ kind: "phrase", name: phrase.name, tex: phrase.tex.join("\n"), start: phrase.start, end: phrase.end, ...writtenIn }]);
+        lines.push([
+            {
+                kind: "phrase",
+                name: phrase.name,
+                tex: phrase.tex.join("\n"),
+                start: phrase.start,
+                end: phrase.end,
+                ...writtenIn,
+            },
+        ]);
         phrase = null;
     };
     let offset = 0;
@@ -106,9 +115,7 @@ function anchorSegment(item) {
  */
 export function suggestedChords(key) {
     const minor = key.endsWith("m");
-    const template = minor
-        ? "{key: Am}\n[Am]a[C]a[Dm]a[E]a[E7]a[F]a[G]a"
-        : "{key: C}\n[C]a[Dm]a[Em]a[F]a[G]a[G7]a[Am]a";
+    const template = minor ? "{key: Am}\n[Am]a[C]a[Dm]a[E]a[E7]a[F]a[G]a" : "{key: C}\n[C]a[Dm]a[Em]a[F]a[G]a[G7]a[Am]a";
     return renderLyrics(template, key)
         .flat()
         .flatMap((item) => (item.kind === "pair" && item.chord ? [item.chord] : []));
@@ -460,8 +467,23 @@ const CHORD_TOKEN = /^(\(?[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?[0-9]*(sus[24]
  */
 export const hasLyricsChart = (list) => list.some((chart) => chart.kind === "lyrics");
 const NOTE_INDEX = {
-    C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5, "F#": 6, Gb: 6,
-    G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+    C: 0,
+    "C#": 1,
+    Db: 1,
+    D: 2,
+    "D#": 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    "F#": 6,
+    Gb: 6,
+    G: 7,
+    "G#": 8,
+    Ab: 8,
+    A: 9,
+    "A#": 10,
+    Bb: 10,
+    B: 11,
 };
 /** Collects the chord names written in `text`, from `[G]` brackets and chord lines. */
 function collectChords(text) {
@@ -500,11 +522,33 @@ function collectChords(text) {
  * scoring it would return whichever enharmonic comes first.
  */
 const KEY_NAMES = [
-    "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B",
-    "Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "Bbm", "Bm",
+    "C",
+    "Db",
+    "D",
+    "Eb",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "Ab",
+    "A",
+    "Bb",
+    "B",
+    "Cm",
+    "C#m",
+    "Dm",
+    "Ebm",
+    "Em",
+    "Fm",
+    "F#m",
+    "Gm",
+    "G#m",
+    "Am",
+    "Bbm",
+    "Bm",
 ];
 const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
 function rotate(profile, tonic) {
     return Array.from({ length: 12 }, (_, i) => profile[(i - tonic + 12) % 12]);
 }

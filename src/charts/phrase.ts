@@ -39,7 +39,8 @@ function startAt(score: model.Score, tempo: number) {
 
 function problemsOf(error: unknown): ReadonlyArray<PhraseProblem> {
   // alphaTab wraps the error that holds the diagnostics.
-  const withDiagnostics = error instanceof Error && error.cause instanceof importer.AlphaTexErrorWithDiagnostics ? error.cause : error
+  const withDiagnostics =
+    error instanceof Error && error.cause instanceof importer.AlphaTexErrorWithDiagnostics ? error.cause : error
   if (!(withDiagnostics instanceof importer.AlphaTexErrorWithDiagnostics)) {
     return [{ line: 1, column: 1, message: error instanceof Error ? error.message : String(error) }]
   }

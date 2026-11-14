@@ -4,6 +4,7 @@ import { fingersNeeded, writeFrets, type Voicing } from "./fretting.ts"
 import { STANDARD_TUNING, voicings } from "./voicing.ts"
 
 const ROOTS = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
+// prettier-ignore
 const SUFFIXES = [
   "", "m", "7", "maj7", "m7", "m7b5", "dim7", "aug", "sus2", "sus4", "7sus4", "5", "6", "m6", "6/9", "9", "m9",
   "maj9", "11", "m11", "13", "m13", "13b9", "7#9", "7b9", "maj7#11", "add9", "madd9", "m7add11", "m(maj7)",
@@ -29,6 +30,7 @@ describe("voicings", () => {
   }, 30_000) // Checks every shape of every chord; under the parallel unit run it takes longer than the 5 s default.
 
   test("the open shapes every guitarist learns first come first", () => {
+    // prettier-ignore
     const first = { C: "x 3 2 0 1 0", A: "x 0 2 2 2 0", D: "x x 0 2 3 2", E: "0 2 2 1 0 0", G: "3 2 0 0 0 3",
       Am: "x 0 2 2 1 0", Em: "0 2 2 0 0 0", Dm: "x x 0 2 3 1", F: "1 3 3 2 1 1", C7: "x 3 2 3 1 0",
       E7: "0 2 0 1 0 0", G7: "3 2 0 0 0 1", Am7: "x 0 2 0 1 0", Cmaj7: "x 3 2 0 0 0",
@@ -47,12 +49,13 @@ describe("voicings", () => {
     for (const name of ["C", "G", "Bm", "F#m7add11", "D/F#"]) {
       const shapes = voicings(spell(name)!)
       shapes.forEach((shape, i) => {
-        const thinner = shapes.slice(0, i).find((better) => shape.frets.every((fret, s) => fret === null || fret === better.frets[s]))
+        const thinner = shapes
+          .slice(0, i)
+          .find((better) => shape.frets.every((fret, s) => fret === null || fret === better.frets[s]))
         expect(thinner, `${name}: ${writeFrets(shape.frets)}`).toBeUndefined()
       })
     }
   })
-
 })
 
 /** The first playability rule a shape breaks, or null; each rule is checked from the frets and the tuning. */
@@ -63,7 +66,8 @@ function brokenRule({ frets }: Voicing, chord: Spelling): string | null {
   const power = chord.optional.length === 0 && chord.required.length === 2
   if (frets.length !== 6) return "one entry per string"
   if (frets.some((fret) => fret !== null && (fret < 0 || fret > 15))) return "frets 0 to 15"
-  if ([...heard].some((pc) => !chord.required.includes(pc) && !chord.optional.includes(pc))) return "a note outside the chord"
+  if ([...heard].some((pc) => !chord.required.includes(pc) && !chord.optional.includes(pc)))
+    return "a note outside the chord"
   if (chord.required.some((pc) => !heard.has(pc))) return "a required note missing"
   if (Math.min(...pitches) % 12 !== chord.bass) return "the bass is not lowest"
   if (pitches.length < (power ? 2 : 3)) return "too few strings"

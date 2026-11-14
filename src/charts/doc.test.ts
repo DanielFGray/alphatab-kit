@@ -3,9 +3,36 @@ import { readFileSync } from "node:fs"
 import { ChordLyricsPair, ChordProParser, Literal, Tag } from "chordsheetjs"
 import { composeChanges, explains, type Change } from "./changes.ts"
 import {
-  addPhrase, addScoreLink, addSection, anchorLine, blockRange, canMoveBlockTo, dropSlots, hasHandle, deleteBlock, duplicateBlock, inPhrase, moveBlock, moveBlockTo, phraseAt, removeSection, setPhrase,
-  anchorText, deleteLine, editLine, insertLineAfter, moveChord, parseDoc, placeChord, removeChord,
-  renameSection, segments, serializeDoc, type ChartDoc, type DocLine, type Edit,
+  addPhrase,
+  addScoreLink,
+  addSection,
+  anchorLine,
+  blockRange,
+  canMoveBlockTo,
+  dropSlots,
+  hasHandle,
+  deleteBlock,
+  duplicateBlock,
+  inPhrase,
+  moveBlock,
+  moveBlockTo,
+  phraseAt,
+  removeSection,
+  setPhrase,
+  anchorText,
+  deleteLine,
+  editLine,
+  insertLineAfter,
+  moveChord,
+  parseDoc,
+  placeChord,
+  removeChord,
+  renameSection,
+  segments,
+  serializeDoc,
+  type ChartDoc,
+  type DocLine,
+  type Edit,
 } from "./doc.ts"
 import { follow, mapRange } from "./follow.ts"
 import { importPasted } from "./lyrics.ts"
@@ -21,7 +48,8 @@ const anchorFromSong = (text: string) => {
     .map((line) =>
       line.items
         .map((item) => {
-          if (item instanceof ChordLyricsPair) return (item.chords.trim() ? `[${item.chords.trim()}]` : "") + (item.lyrics ?? "")
+          if (item instanceof ChordLyricsPair)
+            return (item.chords.trim() ? `[${item.chords.trim()}]` : "") + (item.lyrics ?? "")
           if (item instanceof Tag && item.isSectionStart()) return item.label || item.value
           if (item instanceof Tag && item.isComment()) return item.value
           if (item instanceof Literal) return item.string
@@ -154,14 +182,15 @@ describe("edits", () => {
 })
 
 describe("sections", () => {
-  const labels = (d: ChartDoc) => d.flatMap((l) => (l.kind === "directive" && l.raw.startsWith('{start_of_') ? [anchorText([l])] : []))
+  const labels = (d: ChartDoc) =>
+    d.flatMap((l) => (l.kind === "directive" && l.raw.startsWith("{start_of_") ? [anchorText([l])] : []))
   /** A section edit keeps the stored text valid ChordPro with the anchor text the editor computed. */
   const expectValid = (before: ChartDoc, edit: Edit) => {
     expectExact(before, edit)
     expect(anchorText(parseDoc(serializeDoc(edit.doc)))).toBe(anchorText(edit.doc))
     expect(anchorText(edit.doc)).toBe(anchorFromSong(serializeDoc(edit.doc)))
   }
-  const starts = doc.flatMap((l, i) => (l.kind === "directive" && l.raw.startsWith('{start_of_') ? [i] : []))
+  const starts = doc.flatMap((l, i) => (l.kind === "directive" && l.raw.startsWith("{start_of_") ? [i] : []))
 
   test("starting a section inside one splits it into two of the same kind", () => {
     const edit = addSection(doc, lineOf("Was blind"), "Bridge")
@@ -208,15 +237,28 @@ describe("sections", () => {
   })
 
   test("all adjacent moves preserve every section mark", () => {
-    const simple = parseDoc("{start_of_verse: A}\nalpha\n{end_of_verse}\n{start_of_verse: B}\nbeta\n{end_of_verse}\n{start_of_verse: C}\ngamma\n{end_of_verse}\n{start_of_verse: D}\ndelta\n{end_of_verse}")
-    const starts = simple.flatMap((line, index) => line.kind === "directive" && line.raw.startsWith("{start_of_") ? [index] : [])
-    for (const [index, delta] of [[0, 1], [1, -1], [1, 1], [2, -1], [2, 1], [3, -1]] as const) {
+    const simple = parseDoc(
+      "{start_of_verse: A}\nalpha\n{end_of_verse}\n{start_of_verse: B}\nbeta\n{end_of_verse}\n{start_of_verse: C}\ngamma\n{end_of_verse}\n{start_of_verse: D}\ndelta\n{end_of_verse}",
+    )
+    const starts = simple.flatMap((line, index) =>
+      line.kind === "directive" && line.raw.startsWith("{start_of_") ? [index] : [],
+    )
+    for (const [index, delta] of [
+      [0, 1],
+      [1, -1],
+      [1, 1],
+      [2, -1],
+      [2, 1],
+      [3, -1],
+    ] as const) {
       const before = anchorText(simple)
       const edit = moveBlock(simple, starts[index]!, delta)
       expect(explains(before, anchorText(edit.doc), edit.changes)).toBe(true)
       for (const word of ["alpha", "beta", "gamma", "delta"]) {
         const at = before.indexOf(word)
-        const result = follow({ start: at, end: at + word.length }, [{ before, after: anchorText(edit.doc), recorded: edit.changes }])
+        const result = follow({ start: at, end: at + word.length }, [
+          { before, after: anchorText(edit.doc), recorded: edit.changes },
+        ])
         expect(result.state).toBe("kept")
         if (result.state !== "orphaned") expect(anchorText(edit.doc).slice(result.start, result.end)).toBe(word)
       }
@@ -227,7 +269,11 @@ describe("sections", () => {
     expect(moveBlock(doc, starts[3]!, 1)).toEqual({ doc, changes: [] })
     expect(moveBlock(doc, starts[0]!, -1)).toEqual({ doc, changes: [] })
     const a = addSection(doc, lineOf("Was blind"), "Bridge")
-    const b = moveBlock(a.doc, a.doc.findIndex((l) => l.kind === "directive" && l.raw === "{start_of_verse: Bridge}"), 1)
+    const b = moveBlock(
+      a.doc,
+      a.doc.findIndex((l) => l.kind === "directive" && l.raw === "{start_of_verse: Bridge}"),
+      1,
+    )
     expectExact(doc, { doc: b.doc, changes: composeChanges(a.changes, b.changes) })
   })
 
@@ -270,7 +316,10 @@ describe("segments", () => {
 })
 
 describe("tab", () => {
-  const riff = importPasted(readFileSync(new URL("../../test/fixtures/riff-and-solo.txt", import.meta.url), "utf8"), "G")
+  const riff = importPasted(
+    readFileSync(new URL("../../test/fixtures/riff-and-solo.txt", import.meta.url), "utf8"),
+    "G",
+  )
   const tabDoc = parseDoc(riff)
   const tabLine = (prefix: string) => tabDoc.findIndex((l) => l.kind === "literal" && l.text.startsWith(prefix))
 
@@ -308,7 +357,9 @@ describe("tab", () => {
 
 describe("phrases", () => {
   const verse = ["{key: G}", "{start_of_verse: Verse 1}", "[G]Amazing grace", "[C]How sweet", "{end_of_verse}"]
-  const phraseDoc = parseDoc([...verse, "{start_of_textblock: Riff}", ":8 0.6 3.6", "5.5 [3.5] {h}", "{end_of_textblock}"].join("\n"))
+  const phraseDoc = parseDoc(
+    [...verse, "{start_of_textblock: Riff}", ":8 0.6 3.6", "5.5 [3.5] {h}", "{end_of_textblock}"].join("\n"),
+  )
   const start = 5
 
   test("a phrase's lines are literal, its name and notation read back, and its anchor text matches ChordSheetJS", () => {
@@ -337,7 +388,13 @@ describe("phrases", () => {
   test("a phrase added after a section's last line goes after the section", () => {
     const edit = addPhrase(phraseDoc, 3, "Fill", ":4 3.3")
     expectExact(phraseDoc, edit)
-    expect(serializeDoc(edit.doc).split("\n").slice(3, 8)).toEqual(["[C]How sweet", "{end_of_verse}", "{start_of_textblock: Fill}", ":4 3.3", "{end_of_textblock}"])
+    expect(serializeDoc(edit.doc).split("\n").slice(3, 8)).toEqual([
+      "[C]How sweet",
+      "{end_of_verse}",
+      "{start_of_textblock: Fill}",
+      ":4 3.3",
+      "{end_of_textblock}",
+    ])
   })
 
   test("a notation line that looks like a directive is indented, so it cannot end the phrase", () => {
@@ -378,7 +435,8 @@ describe("blocks", () => {
       "tail",
     ].join("\n"),
   )
-  const at = (text: string) => blocks.findIndex((l) => anchorLine(l) === text || (l.kind === "lyrics" && l.text === text))
+  const at = (text: string) =>
+    blocks.findIndex((l) => anchorLine(l) === text || (l.kind === "lyrics" && l.text === text))
 
   /**
    * Labelled units: a mark on every kept line of the old text must map to that
@@ -406,12 +464,21 @@ describe("blocks", () => {
     const down = moveBlock(blocks, a2, 1)
     expectMarksFollow(blocks, down)
     // Out of the verse, below its end line.
-    expect(serializeDoc(down.doc).split("\n").slice(3, 6)).toEqual(["{end_of_verse}", "a2 two", "{start_of_textblock: Riff}"])
+    expect(serializeDoc(down.doc).split("\n").slice(3, 6)).toEqual([
+      "{end_of_verse}",
+      "a2 two",
+      "{start_of_textblock: Riff}",
+    ])
     // Past the phrase as one block, not into it.
     const past = moveBlock(down.doc, down.doc.indexOf(blocks[a2]!), 1)
     expectMarksFollow(down.doc, past)
     expect(serializeDoc(past.doc).split("\n").slice(3, 9)).toEqual([
-      "{end_of_verse}", "{start_of_textblock: Riff}", "\\tempo 90", "r1 notes", "{end_of_textblock}", "a2 two",
+      "{end_of_verse}",
+      "{start_of_textblock: Riff}",
+      "\\tempo 90",
+      "r1 notes",
+      "{end_of_textblock}",
+      "a2 two",
     ])
     const back = moveBlock(past.doc, past.doc.indexOf(blocks[a2]!), -1)
     expect(serializeDoc(back.doc)).toBe(serializeDoc(down.doc))
@@ -472,7 +539,12 @@ describe("blocks", () => {
   })
 
   test("duplicating a line or a section writes new text and leaves the marks in place", () => {
-    for (const line of [at("a2 two"), at("a1 one"), blocks.findIndex((l) => l.kind === "directive" && l.raw === "{start_of_verse: B}"), at("r1 notes")]) {
+    for (const line of [
+      at("a2 two"),
+      at("a1 one"),
+      blocks.findIndex((l) => l.kind === "directive" && l.raw === "{start_of_verse: B}"),
+      at("r1 notes"),
+    ]) {
       const edit = duplicateBlock(blocks, line)
       expectMarksFollow(blocks, edit)
       expect(edit.changes.every((c) => c.source === undefined && c.to === c.from)).toBe(true)
@@ -498,7 +570,11 @@ describe("blocks", () => {
 
 describe("blocks: deleting the last line, newlines, and steps that undo each other", () => {
   test("deleting the only block gives a valid change set and a chart that reads back", () => {
-    for (const text of ["a1", "{start_of_textblock: P}\n:8 0.6 3.5\n{end_of_textblock}", "{start_of_verse: V}\na1\n{end_of_verse}"]) {
+    for (const text of [
+      "a1",
+      "{start_of_textblock: P}\n:8 0.6 3.5\n{end_of_textblock}",
+      "{start_of_verse: V}\na1\n{end_of_verse}",
+    ]) {
       const chart = parseDoc(text)
       const edit = deleteBlock(chart, 0)
       expect(explains(anchorText(chart), anchorText(edit.doc), edit.changes)).toBe(true)
@@ -574,7 +650,9 @@ describe("blocks: deleting the last line, newlines, and steps that undo each oth
   })
 
   test("a loose comment after a section travels with it, and an unclosed last section can be stepped past", () => {
-    const chart = parseDoc("{start_of_chorus: C}\nc1\n{end_of_chorus}\n{comment: note}\n{start_of_verse: V}\nv1\n{start_of_textblock: P}\n:8 0.6 1.5\n{end_of_textblock}\n{comment: end}")
+    const chart = parseDoc(
+      "{start_of_chorus: C}\nc1\n{end_of_chorus}\n{comment: note}\n{start_of_verse: V}\nv1\n{start_of_textblock: P}\n:8 0.6 1.5\n{end_of_textblock}\n{comment: end}",
+    )
     const down = moveBlock(chart, 0, 1)
     expect(serializeDoc(down.doc).split("\n").slice(0, 2)).toEqual(["{start_of_verse: V}", "v1"])
     expect(serializeDoc(down.doc).endsWith("{end_of_chorus}\n{comment: note}")).toBe(false)
@@ -588,7 +666,9 @@ describe("blocks: deleting the last line, newlines, and steps that undo each oth
 
 describe("drop slots", () => {
   test("a row's slots: a line is bracketed by itself, a section heading is entered, a tab or phrase is jumped with its end line", () => {
-    const chart = parseDoc("{start_of_verse: V}\nv1\n{end_of_verse}\n{comment: note}\n{start_of_textblock: P}\n:8 0.6 1.5\n{end_of_textblock}\n{comment: after}\ntail")
+    const chart = parseDoc(
+      "{start_of_verse: V}\nv1\n{end_of_verse}\n{comment: note}\n{start_of_textblock: P}\n:8 0.6 1.5\n{end_of_textblock}\n{comment: after}\ntail",
+    )
     expect(dropSlots(chart, 1)).toEqual({ before: 1, after: 2 })
     expect(dropSlots(chart, 0)).toEqual({ before: 0, after: 1 })
     // The phrase's notation line stands for the phrase; the loose comment after its end line is not part of the jump.

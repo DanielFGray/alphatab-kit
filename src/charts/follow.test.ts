@@ -4,7 +4,9 @@ import { anchorText, deleteLine, insertLineAfter, parseDoc, placeChord, type Edi
 import { follow, type Step } from "./follow.ts"
 import { importPasted } from "./lyrics.ts"
 
-const doc = parseDoc(importPasted(readFileSync(new URL("../../test/fixtures/amazing-grace.txt", import.meta.url), "utf8"), "G"))
+const doc = parseDoc(
+  importPasted(readFileSync(new URL("../../test/fixtures/amazing-grace.txt", import.meta.url), "utf8"), "G"),
+)
 const text = anchorText(doc)
 
 /** The range of the first occurrence of `word` in the anchor text. */

@@ -45,8 +45,10 @@ describe("textFromWords", () => {
   test("a chord goes over the lyric character under its left edge, in any font", () => {
     // "wide" is twice as wide as "narrow" per letter: column counts would put the chord elsewhere.
     const words = [
-      word(0, "G", 10, 0), word(0, "C", 120, 0),
-      word(1, "narrow", 10, 30, 60), word(1, "wide", 80, 30, 80),
+      word(0, "G", 10, 0),
+      word(0, "C", 120, 0),
+      word(1, "narrow", 10, 30, 60),
+      word(1, "wide", 80, 30, 80),
     ]
     // Halfway across "wide" is its "d", the tenth character.
     expect(textFromWords(words)).toBe("G        C\nnarrow wide")
@@ -67,7 +69,8 @@ describe("textFromWords", () => {
     const words = [
       word(0, "Intro", 10, 0, 50),
       word(1, "Riff", 10, 30, 40),
-      word(2, "G", 10, 60), word(2, "C", 110, 60),
+      word(2, "G", 10, 60),
+      word(2, "C", 110, 60),
       word(3, "Verse", 10, 150, 50),
     ]
     expect(textFromWords(words)).toBe("Intro\nRiff\nG         C\n\nVerse")

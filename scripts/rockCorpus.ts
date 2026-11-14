@@ -23,7 +23,11 @@ export type CorpusChord = {
   readonly key: string
 }
 
-export type CorpusSong = { readonly song: string; readonly analyst: "dt" | "tdc"; readonly chords: ReadonlyArray<CorpusChord> }
+export type CorpusSong = {
+  readonly song: string
+  readonly analyst: "dt" | "tdc"
+  readonly chords: ReadonlyArray<CorpusChord>
+}
 
 /** Every analysis in `dir`, with its chords in order. A held chord (`.`) is not repeated. */
 export function readCorpus(dir: string): ReadonlyArray<CorpusSong> {
@@ -32,7 +36,11 @@ export function readCorpus(dir: string): ReadonlyArray<CorpusSong> {
     .sort()
     .map((file) => {
       const [, song, analyst] = file.match(/^(.*)_(dt|tdc)\.txt$/)!
-      return { song: song!, analyst: analyst as "dt" | "tdc", chords: readAnalysis(readFileSync(join(dir, file), "utf8")) }
+      return {
+        song: song!,
+        analyst: analyst as "dt" | "tdc",
+        chords: readAnalysis(readFileSync(join(dir, file), "utf8")),
+      }
     })
 }
 
@@ -70,7 +78,11 @@ function degreeOf(numeral: string): { semitones: number; minor: boolean; length:
   const found = numeral.match(/^([b#]?)(VII|VI|IV|V|III|II|I|vii|vi|iv|v|iii|ii|i)/)
   if (found === null) return null
   const shift = found[1] === "b" ? -1 : found[1] === "#" ? 1 : 0
-  return { semitones: (ROMAN[found[2]!.toUpperCase()]! + shift + 12) % 12, minor: found[2] !== found[2]!.toUpperCase(), length: found[0].length }
+  return {
+    semitones: (ROMAN[found[2]!.toUpperCase()]! + shift + 12) % 12,
+    minor: found[2] !== found[2]!.toUpperCase(),
+    length: found[0].length,
+  }
 }
 
 /**
@@ -104,12 +116,24 @@ function chordName(symbol: string, tonic: number): string | null {
   else [suffix, seventh] = ["maj7", 11]
   if (seventh === 0 && sevenths) seventh = 10
 
-  const bassAbove = inversionFigure === "6" || inversionFigure === "65" ? third : inversionFigure === "64" || inversionFigure === "43" ? fifth : inversionFigure === "42" ? seventh : 0
+  const bassAbove =
+    inversionFigure === "6" || inversionFigure === "65"
+      ? third
+      : inversionFigure === "64" || inversionFigure === "43"
+        ? fifth
+        : inversionFigure === "42"
+          ? seventh
+          : 0
   const name = NOTE[root]! + suffix
   return bassAbove === 0 ? name : `${name}/${NOTE[(root + bassAbove) % 12]}`
 }
 
-export type CorpusRun = { readonly song: string; readonly analyst: CorpusSong["analyst"]; readonly key: string; readonly chords: ReadonlyArray<string> }
+export type CorpusRun = {
+  readonly song: string
+  readonly analyst: CorpusSong["analyst"]
+  readonly key: string
+  readonly chords: ReadonlyArray<string>
+}
 
 /**
  * The analyses as runs of chord names, one run per stretch in one key, with a

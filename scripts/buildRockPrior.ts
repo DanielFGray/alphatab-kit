@@ -8,6 +8,10 @@ import { corpusRuns, priorFrom, readCorpus } from "./rockCorpus.ts"
 const dir = process.argv[2]
 if (!dir) throw new Error("usage: bun scripts/buildRockPrior.ts <rs200_harmony_exp dir>")
 const prior = priorFrom(corpusRuns(readCorpus(dir)))
-const source = "Counted from the rock corpus (rs200) by Trevor de Clercq and David Temperley, https://rockcorpus.midside.com, CC BY 4.0. Built by scripts/buildRockPrior.ts."
-await Bun.write(new URL("../src/charts/rock-prior.json", import.meta.url), JSON.stringify({ source, ...prior }, null, 1) + "\n")
+const source =
+  "Counted from the rock corpus (rs200) by Trevor de Clercq and David Temperley, https://rockcorpus.midside.com, CC BY 4.0. Built by scripts/buildRockPrior.ts."
+await Bun.write(
+  new URL("../src/charts/rock-prior.json", import.meta.url),
+  JSON.stringify({ source, ...prior }, null, 1) + "\n",
+)
 console.log(`classes: ${Object.keys(prior.unigram).length}`)

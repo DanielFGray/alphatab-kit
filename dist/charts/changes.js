@@ -24,18 +24,28 @@ export function rearranged(length, parts) {
 /** Whether `changes` is a valid change set: sorted, without overlap, with no empty change. */
 export function isChangeSet(changes) {
     let end = 0;
-    const sources = changes.flatMap((change) => change.source === undefined ? [] : [{ start: change.source, end: change.source + change.insert }]).sort((a, b) => a.start - b.start);
+    const sources = changes
+        .flatMap((change) => change.source === undefined ? [] : [{ start: change.source, end: change.source + change.insert }])
+        .sort((a, b) => a.start - b.start);
     const sourcesOverlap = sources.some((source, i) => i > 0 && source.start < sources[i - 1].end);
-    return !sourcesOverlap && changes.every((c) => {
-        const source = c.source;
-        // A source must belong to one other deleted change, so it cannot be a copy.
-        const covered = source === undefined || changes.some((other) => other !== c && other.to > other.from && other.from <= source && source + c.insert <= other.to);
-        const ok = Number.isInteger(c.from) && Number.isInteger(c.to) && Number.isInteger(c.insert) &&
-            (source === undefined || (Number.isInteger(source) && c.insert > 0)) && c.from >= end && c.to >= c.from &&
-            c.insert >= 0 && (c.to > c.from || c.insert > 0) && covered;
-        end = c.to;
-        return ok;
-    });
+    return (!sourcesOverlap &&
+        changes.every((c) => {
+            const source = c.source;
+            // A source must belong to one other deleted change, so it cannot be a copy.
+            const covered = source === undefined ||
+                changes.some((other) => other !== c && other.to > other.from && other.from <= source && source + c.insert <= other.to);
+            const ok = Number.isInteger(c.from) &&
+                Number.isInteger(c.to) &&
+                Number.isInteger(c.insert) &&
+                (source === undefined || (Number.isInteger(source) && c.insert > 0)) &&
+                c.from >= end &&
+                c.to >= c.from &&
+                c.insert >= 0 &&
+                (c.to > c.from || c.insert > 0) &&
+                covered;
+            end = c.to;
+            return ok;
+        }));
 }
 /**
  * Whether `changes` turns `before` into `after`: the text outside the changes
@@ -50,7 +60,8 @@ export function explains(before, after, changes) {
     for (const c of changes) {
         if (after.slice(to, to + c.from - from) !== before.slice(from, c.from))
             return false;
-        if (c.source !== undefined && after.slice(to + c.from - from, to + c.from - from + c.insert) !== before.slice(c.source, c.source + c.insert))
+        if (c.source !== undefined &&
+            after.slice(to + c.from - from, to + c.from - from + c.insert) !== before.slice(c.source, c.source + c.insert))
             return false;
         to += c.from - from + c.insert;
         from = c.to;
@@ -139,7 +150,8 @@ function fromPieces(pieces) {
 /** Appends `piece`, joining it to the one before when they continue each other. */
 function push(pieces, piece) {
     const last = pieces.at(-1);
-    const joins = last !== undefined && Number.isFinite(last.n) &&
+    const joins = last !== undefined &&
+        Number.isFinite(last.n) &&
         (last.from === undefined ? piece.from === undefined : piece.from === last.from + last.n);
     if (last !== undefined && joins)
         pieces[pieces.length - 1] = { n: last.n + piece.n, from: last.from };

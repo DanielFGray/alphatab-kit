@@ -3,6 +3,7 @@
  * A key on a black-key root is listed under both its sharp and its flat name
  * (C# and Db), so a caller can keep the spelling a song was saved with.
  */
+// prettier-ignore
 export const MUSICAL_KEYS = [
     "C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb",
     "G", "G#", "Ab", "A", "A#", "Bb", "B",

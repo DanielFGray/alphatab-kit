@@ -41,7 +41,11 @@ test("shows the speed to two decimals at most, without trailing zeros", () => {
 
 test("each part gets the app's classes and test ids, and its part name", () => {
   mounted = render(
-    <SpeedInput speed={1} onSpeed={() => {}} parts={{ root: { className: "flex" }, input: { className: "field", "data-pwid": "score-speed" } }} />,
+    <SpeedInput
+      speed={1}
+      onSpeed={() => {}}
+      parts={{ root: { className: "flex" }, input: { className: "field", "data-pwid": "score-speed" } }}
+    />,
   )
   expect(mounted.host.querySelector("[data-part='root']")?.className).toBe("flex")
   const el = field(mounted.host)

@@ -33,7 +33,9 @@ function layout(played, chords, lines) {
     const out = [];
     let ci = 0;
     let lastChord = null;
-    const sections = played.filter((p) => p.bar.section?.text.trim()).map((p) => ({ at: p.at, label: p.bar.section.text.trim() }));
+    const sections = played
+        .filter((p) => p.bar.section?.text.trim())
+        .map((p) => ({ at: p.at, label: p.bar.section.text.trim() }));
     let si = 0;
     const sectionsBefore = (t) => {
         for (; si < sections.length && sections[si].at <= t; si++) {
@@ -162,7 +164,9 @@ function lyricTrack(score) {
     let best = -1;
     let most = 0;
     for (const track of score.tracks) {
-        const n = track.staves.flatMap((s) => s.bars.flatMap((b) => b.voices.flatMap((v) => v.beats))).filter((b) => b.lyrics?.some(Boolean)).length;
+        const n = track.staves
+            .flatMap((s) => s.bars.flatMap((b) => b.voices.flatMap((v) => v.beats)))
+            .filter((b) => b.lyrics?.some(Boolean)).length;
         if (n > most) {
             most = n;
             best = track.index;
@@ -230,7 +234,9 @@ function fit(line) {
         if (line[k - 1].text.endsWith("-"))
             continue;
         // On equal rests, the split nearer the middle leaves two lines of even length.
-        if (best < 0 || gap(k) > gap(best) || (gap(k) === gap(best) && Math.abs(k - line.length / 2) < Math.abs(best - line.length / 2)))
+        if (best < 0 ||
+            gap(k) > gap(best) ||
+            (gap(k) === gap(best) && Math.abs(k - line.length / 2) < Math.abs(best - line.length / 2)))
             best = k;
     }
     return best < 0 ? [line] : [...fit(line.slice(0, best)), ...fit(line.slice(best))];

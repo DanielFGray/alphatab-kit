@@ -48,7 +48,11 @@ export function chordNumerals(chords: ReadonlyArray<string>, key: string | null)
 }
 
 /** The tonic, and the pitch classes a chord may use and still count as in the key. */
-export type KeyScale = { readonly tonic: PitchClass; readonly minor: boolean; readonly pitches: ReadonlySet<PitchClass> }
+export type KeyScale = {
+  readonly tonic: PitchClass
+  readonly minor: boolean
+  readonly pitches: ReadonlySet<PitchClass>
+}
 
 /**
  * Reads a key name ("G", "F#m"). A minor key holds the natural minor scale plus
@@ -68,7 +72,20 @@ export function inKey(spelling: Spelling, scale: KeyScale): boolean {
 }
 
 /** Roman numeral names for each semitone above the tonic. */
-export const DEGREE_NAME: ReadonlyArray<string> = ["I", "bII", "II", "bIII", "III", "IV", "#IV", "V", "bVI", "VI", "bVII", "VII"]
+export const DEGREE_NAME: ReadonlyArray<string> = [
+  "I",
+  "bII",
+  "II",
+  "bIII",
+  "III",
+  "IV",
+  "#IV",
+  "V",
+  "bVI",
+  "VI",
+  "bVII",
+  "VII",
+]
 
 /** Letters above the tonic's letter for each numeral. */
 export const ROMAN_STEP: Readonly<Record<string, number>> = { I: 0, II: 1, III: 2, IV: 3, V: 4, VI: 5, VII: 6 }

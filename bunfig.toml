@@ -1,2 +1,6 @@
 [test]
 preload = ["./test/dom.ts"]
+
+[fmt]
+printWidth = 120
+semi = false

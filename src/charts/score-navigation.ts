@@ -78,11 +78,7 @@ export function beatIndexAt(beats: readonly NavBeat[], tick: number): number {
  * when the index is out of range. Stops at the bar boundary, so a bar with
  * one beat returns that beat for both edges.
  */
-export function barEdgeBeat(
-  beats: readonly NavBeat[],
-  currentIndex: number,
-  edge: "start" | "end",
-): NavBeat | null {
+export function barEdgeBeat(beats: readonly NavBeat[], currentIndex: number, edge: "start" | "end"): NavBeat | null {
   const currentBeat = beats[currentIndex]
   if (!currentBeat) {
     return null
@@ -94,10 +90,7 @@ export function barEdgeBeat(
       index -= 1
     }
   } else {
-    while (
-      index < beats.length - 1 &&
-      beats[index + 1]?.masterBarIndex === currentBeat.masterBarIndex
-    ) {
+    while (index < beats.length - 1 && beats[index + 1]?.masterBarIndex === currentBeat.masterBarIndex) {
       index += 1
     }
   }

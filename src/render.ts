@@ -9,14 +9,20 @@ export const ScoreSource = Schema.Union([
 ])
 export type ScoreSource = typeof ScoreSource.Type
 
-export class ScoreLoadError extends Schema.TaggedError<ScoreLoadError, { readonly brand: unique symbol }>()("ScoreLoadError", {
-  cause: Schema.Defect(),
-}) {}
+export class ScoreLoadError extends Schema.TaggedError<ScoreLoadError, { readonly brand: unique symbol }>()(
+  "ScoreLoadError",
+  {
+    cause: Schema.Defect(),
+  },
+) {}
 
-export class ScoreRenderError extends Schema.TaggedError<ScoreRenderError, { readonly brand: unique symbol }>()("ScoreRenderError", {
-  message: Schema.String,
-  cause: Schema.optional(Schema.Defect()),
-}) {}
+export class ScoreRenderError extends Schema.TaggedError<ScoreRenderError, { readonly brand: unique symbol }>()(
+  "ScoreRenderError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {}
 
 export interface RenderOptions {
   /** Layout width in CSS pixels; line breaks follow it. */
@@ -82,10 +88,14 @@ const draw = (score: model.Score, settings: Settings, options: RenderOptions) =>
     onSome: Effect.fail,
     onNone: () =>
       Option.match(size, {
-        onNone: () =>
-          Effect.fail(new ScoreRenderError({ message: `alphaTab drew nothing at width ${options.width}` })),
+        onNone: () => Effect.fail(new ScoreRenderError({ message: `alphaTab drew nothing at width ${options.width}` })),
         onSome: ({ width, height }): Effect.Effect<StaticScore> =>
-          Effect.succeed({ width, height, musicFontSize: settings.display.resources.engravingSettings.musicFontSize, parts }),
+          Effect.succeed({
+            width,
+            height,
+            musicFontSize: settings.display.resources.engravingSettings.musicFontSize,
+            parts,
+          }),
       }),
   })
 }

@@ -71,14 +71,21 @@ export function suggest(
   const song = countChanges([before, after])
   const names = namesByClass(used, scale)
   const nameOf = (cls: string) => names.get(cls) ?? chordName(cls, slot.key, scale, next)
-  const offer = (chord: string, reason: string): Suggestion => ({ chord, numeral: numeral(chord, slot.key, next), reason })
+  const offer = (chord: string, reason: string): Suggestion => ({
+    chord,
+    numeral: numeral(chord, slot.key, next),
+    reason,
+  })
 
   const previous = slot.before.at(-1) ?? null
   const ranked = rankClasses(before, after, prior, weights)
   const toOffer = (cls: string) => {
     const chord = nameOf(cls)
     const follows = previous !== null && (song.bigram.get(before.at(-1)!)?.get(cls) ?? 0) > 0
-    return offer(chord, reasonFor(chord, slot.key, scale, next, names.has(cls) ? (follows ? previous : "") : null, previous))
+    return offer(
+      chord,
+      reasonFor(chord, slot.key, scale, next, names.has(cls) ? (follows ? previous : "") : null, previous),
+    )
   }
   const repeat = slot.repeat ? [offer(slot.repeat.chord, `as in ${slot.repeat.section}`)] : []
   const unused = ranked.filter((cls) => !names.has(cls))
@@ -124,17 +131,26 @@ function repeatAt(doc: ChartDoc, line: number, at: number): Slot["repeat"] {
   const ordinal = slotLine.chords.filter((chord) => chord.at < at).length
   const rest = slotLine.chords.filter((chord) => chord.at !== at).map((chord) => chord.chord)
   const starts = doc.flatMap((each, index) =>
-    index !== here.start && each.kind === "directive" && /^\{\s*start_of_/.test(each.raw) && sectionName(doc, index) === name ? [index] : [],
+    index !== here.start &&
+    each.kind === "directive" &&
+    /^\{\s*start_of_/.test(each.raw) &&
+    sectionName(doc, index) === name
+      ? [index]
+      : [],
   )
   // The nearest earlier section first, then the nearest later one.
-  const order = [...starts.filter((start) => start < here.start).reverse(), ...starts.filter((start) => start > here.start)]
+  const order = [
+    ...starts.filter((start) => start < here.start).reverse(),
+    ...starts.filter((start) => start > here.start),
+  ]
   for (const start of order) {
     const other = doc[lyricLines(doc, start)[row] ?? -1]
     if (other?.kind !== "lyrics") continue
     const chords = other.chords.map((chord) => chord.chord)
     const chord = chords[ordinal]
     const filled = [...rest.slice(0, ordinal), chord, ...rest.slice(ordinal)]
-    if (chord !== undefined && filled.every((name, index) => index >= chords.length || chords[index] === name)) return { chord, section: sectionLabel(doc, start) }
+    if (chord !== undefined && filled.every((name, index) => index >= chords.length || chords[index] === name))
+      return { chord, section: sectionLabel(doc, start) }
   }
   return null
 }
@@ -157,7 +173,10 @@ function sectionLabel(doc: ChartDoc, start: number): string {
 
 /** A section's label without its number, for matching: "Verse 2" and "verse" are both "verse". */
 function sectionName(doc: ChartDoc, start: number): string {
-  return sectionLabel(doc, start).replace(/\s*\d+\s*$/, "").trim().toLowerCase()
+  return sectionLabel(doc, start)
+    .replace(/\s*\d+\s*$/, "")
+    .trim()
+    .toLowerCase()
 }
 
 /**
@@ -179,7 +198,12 @@ export function chordClass(chord: string, scale: KeyScale): string | null {
  * Every class the corpus or the song has, most likely first, for a slot between
  * the classes `before` and `after` (each a run of chord changes).
  */
-export function rankClasses(before: ReadonlyArray<string>, after: ReadonlyArray<string>, prior: Prior, weights = WEIGHTS): ReadonlyArray<string> {
+export function rankClasses(
+  before: ReadonlyArray<string>,
+  after: ReadonlyArray<string>,
+  prior: Prior,
+  weights = WEIGHTS,
+): ReadonlyArray<string> {
   const odds = classOdds(before, after, countChanges([before, after]), prior, weights)
   return [...odds].sort((a, b) => b[1] - a[1]).map(([cls]) => cls)
 }
@@ -265,7 +289,14 @@ function namesByClass(chords: ReadonlyArray<string>, scale: KeyScale): ReadonlyM
  * chord, the chord before the slot when the song already moves from it to this
  * chord, and "" when the song uses the chord elsewhere.
  */
-function reasonFor(chord: string, key: string, scale: KeyScale, next: string | null, usedAfter: string | null, previous: string | null): string {
+function reasonFor(
+  chord: string,
+  key: string,
+  scale: KeyScale,
+  next: string | null,
+  usedAfter: string | null,
+  previous: string | null,
+): string {
   if (next !== null && numeral(chord, key, next)?.includes("/")) return `leads to ${next}`
   if (usedAfter) return `follows ${usedAfter} in this song`
   if (usedAfter === "") return "in this song"

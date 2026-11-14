@@ -73,7 +73,9 @@ function slashStaff(slots: ReadonlyArray<number>): string {
     pieces(from, to).forEach((piece, i) => {
       // alphaTex puts a tie on the note and a dot on the beat: `C4{t}.4{d}`.
       const head = note ? (i > 0 ? "C4{t}" : "C4") : "r"
-      bars[Math.floor(piece.at / SLOTS_PER_BAR)]!.push(`${head}.${piece.value.duration}${piece.value.dotted ? "{d}" : ""}`)
+      bars[Math.floor(piece.at / SLOTS_PER_BAR)]!.push(
+        `${head}.${piece.value.duration}${piece.value.dotted ? "{d}" : ""}`,
+      )
     })
   if (starts[0]! > 0) write(0, starts[0]!, false)
   starts.forEach((start, i) => write(start, starts[i + 1] ?? end, true))
@@ -102,7 +104,7 @@ const VALUES: ReadonlyArray<NoteValue> = [
  */
 function pieces(from: number, to: number): ReadonlyArray<{ readonly at: number; readonly value: NoteValue }> {
   const out: Array<{ at: number; value: NoteValue }> = []
-  for (let at = from; at < to; ) {
+  for (let at = from; at < to;) {
     const inBar = at % SLOTS_PER_BAR
     const value = VALUES.find((v) => v.slots <= to - at && inBar % (v.dotted ? (v.slots / 3) * 4 : v.slots) === 0)!
     out.push({ at, value })

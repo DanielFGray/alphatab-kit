@@ -12,7 +12,8 @@ function notesAt(slots: ReadonlyArray<number>, delayMs = 30, extra: ReadonlyArra
 }
 
 const options = (o: Partial<TakeOptions> = {}): TakeOptions => ({ bpm: BPM, expectedDelayMs: 20, shift: 0, ...o })
-const rhythmOf = (slots: ReadonlyArray<number>, extra: ReadonlyArray<number> = []) => rhythm(readTake(notesAt(slots, 30, extra), options()).tex)
+const rhythmOf = (slots: ReadonlyArray<number>, extra: ReadonlyArray<number> = []) =>
+  rhythm(readTake(notesAt(slots, 30, extra), options()).tex)
 
 /** What alphaTab reads from the take's alphaTex, bar by bar: duration, then "r" for a rest, "." for a dot, "~" for a tie. */
 function rhythm(tex: string | null): string {
@@ -23,9 +24,10 @@ function rhythm(tex: string | null): string {
   expect(staff.showSlash && !staff.showStandardNotation && !staff.showTablature).toBe(true)
   return staff.bars
     .map((bar) =>
-      bar.voices[0]!.beats
-        .map((b) => `${b.duration}${b.isRest ? "r" : ""}${".".repeat(b.dots)}${b.notes.some((n) => n.isTieDestination) ? "~" : ""}`)
-        .join(" "),
+      bar.voices[0]!.beats.map(
+        (b) =>
+          `${b.duration}${b.isRest ? "r" : ""}${".".repeat(b.dots)}${b.notes.some((n) => n.isTieDestination) ? "~" : ""}`,
+      ).join(" "),
     )
     .join(" | ")
 }

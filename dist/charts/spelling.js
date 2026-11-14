@@ -47,7 +47,15 @@ export function spell(name) {
     for (const pitchClass of may)
         if (must.has(pitchClass))
             may.delete(pitchClass);
-    return { root: root.pitchClass, bass, rootLetter: root.letter, bassLetter: slash === null ? root.letter : slash.letter, required: ascending(must), optional: ascending(may), tones: chord.tones };
+    return {
+        root: root.pitchClass,
+        bass,
+        rootLetter: root.letter,
+        bassLetter: slash === null ? root.letter : slash.letter,
+        required: ascending(must),
+        optional: ascending(may),
+        tones: chord.tones,
+    };
 }
 /** Each letter's natural pitch class. */
 export const NATURALS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };

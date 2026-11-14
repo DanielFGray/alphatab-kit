@@ -6,7 +6,9 @@ import { renderScoreSvg } from "./render.ts"
 import { staticScoreHtml } from "./static.ts"
 
 test("server markup holds the static score, the player element and the frame CSS", async () => {
-  const score = await Effect.runPromise(renderScoreSvg({ _tag: "AlphaTex", tex: ". :4 0.6 2.5 | 3.3 2.3" }, { width: 600 }))
+  const score = await Effect.runPromise(
+    renderScoreSvg({ _tag: "AlphaTex", tex: ". :4 0.6 2.5 | 3.3 2.3" }, { width: 600 }),
+  )
   const html = renderToString(
     <StaticScoreFrame score={score} playerReady={false}>
       <div id="player" />

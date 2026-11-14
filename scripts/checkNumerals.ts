@@ -48,7 +48,12 @@ for (const [, pair] of bySong) {
 
 const agreement = (both: number, disagree: number) => ((100 * both) / (both + disagree)).toFixed(1)
 console.log(`analyses: ${songs.length}`)
-console.log(`app vs expert, applied chords: both ${tally.both}, expert only ${tally.expertOnly}, app only ${tally.appOnly} -> ${agreement(tally.both, tally.expertOnly + tally.appOnly)}% agreement`)
-console.log(`expert vs expert (songs with equal chord counts): both ${experts.both}, one ${experts.one} -> ${agreement(experts.both, experts.one)}% agreement`)
+console.log(
+  `app vs expert, applied chords: both ${tally.both}, expert only ${tally.expertOnly}, app only ${tally.appOnly} -> ${agreement(tally.both, tally.expertOnly + tally.appOnly)}% agreement`,
+)
+console.log(
+  `expert vs expert (songs with equal chord counts): both ${experts.both}, one ${experts.one} -> ${agreement(experts.both, experts.one)}% agreement`,
+)
 console.log("\nmost frequent disagreements:")
-for (const [what, count] of [...misses].sort((a, b) => b[1] - a[1]).slice(0, 25)) console.log(`${String(count).padStart(4)}  ${what}`)
+for (const [what, count] of [...misses].sort((a, b) => b[1] - a[1]).slice(0, 25))
+  console.log(`${String(count).padStart(4)}  ${what}`)

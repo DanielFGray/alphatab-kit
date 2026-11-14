@@ -15,7 +15,12 @@ export function NotationToggles({ notation, onNotation, parts }: NotationToggles
   return (
     <div {...partProps(parts, "root")}>
       Show
-      <button {...partProps(parts, "standard")} type="button" aria-pressed={notation.standard} onClick={() => onNotation("standard")}>
+      <button
+        {...partProps(parts, "standard")}
+        type="button"
+        aria-pressed={notation.standard}
+        onClick={() => onNotation("standard")}
+      >
         Standard
       </button>
       <button {...partProps(parts, "tab")} type="button" aria-pressed={notation.tab} onClick={() => onNotation("tab")}>

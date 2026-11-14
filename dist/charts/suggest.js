@@ -40,7 +40,11 @@ export function suggest(slot, limit = 5, prior = ROCK_PRIOR, weights = WEIGHTS) 
     const song = countChanges([before, after]);
     const names = namesByClass(used, scale);
     const nameOf = (cls) => names.get(cls) ?? chordName(cls, slot.key, scale, next);
-    const offer = (chord, reason) => ({ chord, numeral: numeral(chord, slot.key, next), reason });
+    const offer = (chord, reason) => ({
+        chord,
+        numeral: numeral(chord, slot.key, next),
+        reason,
+    });
     const previous = slot.before.at(-1) ?? null;
     const ranked = rankClasses(before, after, prior, weights);
     const toOffer = (cls) => {
@@ -93,9 +97,17 @@ function repeatAt(doc, line, at) {
     const row = lyricLines(doc, here.start).indexOf(line);
     const ordinal = slotLine.chords.filter((chord) => chord.at < at).length;
     const rest = slotLine.chords.filter((chord) => chord.at !== at).map((chord) => chord.chord);
-    const starts = doc.flatMap((each, index) => index !== here.start && each.kind === "directive" && /^\{\s*start_of_/.test(each.raw) && sectionName(doc, index) === name ? [index] : []);
+    const starts = doc.flatMap((each, index) => index !== here.start &&
+        each.kind === "directive" &&
+        /^\{\s*start_of_/.test(each.raw) &&
+        sectionName(doc, index) === name
+        ? [index]
+        : []);
     // The nearest earlier section first, then the nearest later one.
-    const order = [...starts.filter((start) => start < here.start).reverse(), ...starts.filter((start) => start > here.start)];
+    const order = [
+        ...starts.filter((start) => start < here.start).reverse(),
+        ...starts.filter((start) => start > here.start),
+    ];
     for (const start of order) {
         const other = doc[lyricLines(doc, start)[row] ?? -1];
         if (other?.kind !== "lyrics")
@@ -125,7 +137,10 @@ function sectionLabel(doc, start) {
 }
 /** A section's label without its number, for matching: "Verse 2" and "verse" are both "verse". */
 function sectionName(doc, start) {
-    return sectionLabel(doc, start).replace(/\s*\d+\s*$/, "").trim().toLowerCase();
+    return sectionLabel(doc, start)
+        .replace(/\s*\d+\s*$/, "")
+        .trim()
+        .toLowerCase();
 }
 /**
  * The class of a chord in a key: its root's degree with the case and mark of its

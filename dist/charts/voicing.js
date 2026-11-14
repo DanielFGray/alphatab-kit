@@ -51,7 +51,13 @@ function scoreOf(frets, chord, tuning) {
     const optionalMissing = chord.optional.filter((pc) => !heard.has(pc)).length;
     const interiorMutes = sounding.length === 0 ? 0 : sounding.at(-1) - sounding[0] + 1 - sounding.length;
     const unisons = pitches.length - new Set(pitches).size;
-    return (4 * interiorMutes + 2 * optionalMissing + fingersNeeded(frets) + 2 * span + 2 * lowest + 6 * unisons - 1.5 * sounding.length);
+    return (4 * interiorMutes +
+        2 * optionalMissing +
+        fingersNeeded(frets) +
+        2 * span +
+        2 * lowest +
+        6 * unisons -
+        1.5 * sounding.length);
 }
 /** Every playable shape whose fretted notes lie in frets start..start+3. */
 function shapesIn(chord, tuning, start) {

@@ -42,7 +42,8 @@ export function readScoreLink(value: string): ScoreLinkReading {
   const section = fields.get("section")
   const bars = fields.get("bars")
   if (section !== undefined && bars === undefined) return { link: { chartId, track, range: { section } } }
-  if (bars === undefined || section !== undefined) return { problem: "The score link needs a section or bars, not both" }
+  if (bars === undefined || section !== undefined)
+    return { problem: "The score link needs a section or bars, not both" }
   const numbers = /^(\d+)-(\d+)$/.exec(bars)
   if (numbers === null) return { problem: `The bars "${bars}" are not a range such as 5-8` }
   const from = Number(numbers[1])
@@ -87,7 +88,9 @@ function sectionSpan(outline: ScoreOutline, at: number): { first: number; last: 
  * section by its marker, so a marker used by two sections cannot be linked to
  * either: `repeated` is set on both, and the bars must be named instead.
  */
-export function sectionChoices(outline: ScoreOutline): Array<{ marker: string; first: number; last: number; repeated: boolean }> {
+export function sectionChoices(
+  outline: ScoreOutline,
+): Array<{ marker: string; first: number; last: number; repeated: boolean }> {
   return outline.sections.map((section, at) => ({
     marker: section.marker,
     ...sectionSpan(outline, at),

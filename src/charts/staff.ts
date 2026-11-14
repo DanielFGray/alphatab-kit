@@ -54,7 +54,7 @@ export function staffSides(steps: ReadonlyArray<number>): ReadonlyArray<"left" |
 function toneNote(spelling: Spelling, degree: number, semitones: number): StaffNote {
   const letter = letterAbove(spelling.rootLetter, degree - 1)
   const octave = 4 + Math.floor((indexOf(spelling.rootLetter) + (degree - 1)) / 7)
-  const pitchClass = ((spelling.root + semitones) % 12 + 12) % 12
+  const pitchClass = (((spelling.root + semitones) % 12) + 12) % 12
   return { letter, accidental: accidentalOf(pitchClass, letter), octave, degree }
 }
 
@@ -66,7 +66,7 @@ function bassNote(spelling: Spelling): StaffNote | null {
   while (pitchOf(spelling.bassLetter, bassAccidental, octave) >= rootPitch) octave -= 1
   let degree: number | null = null
   for (const [candidate, semitones] of spelling.tones) {
-    const pitchClass = ((spelling.root + semitones) % 12 + 12) % 12
+    const pitchClass = (((spelling.root + semitones) % 12) + 12) % 12
     if (pitchClass === spelling.bass && (degree === null || candidate < degree)) degree = candidate
   }
   return { letter: spelling.bassLetter, accidental: bassAccidental, octave, degree }

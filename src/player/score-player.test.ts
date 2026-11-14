@@ -3,8 +3,14 @@ import { PlayerMode, synth, type model } from "@coderline/alphatab"
 import { beatSpanOf, selectionLabel } from "../charts/score-bars.ts"
 import { createMixer, setMute, setSolo, setTrackVolume } from "../charts/score-mixer.ts"
 import type { Notation } from "../charts/score-notation.ts"
-import { createScorePlayer, type DisplaySettings, type PlayerMasterBar,
-  type PlayerApi, type PlayerStaff, type PlayerTrack } from "./score-player.ts"
+import {
+  createScorePlayer,
+  type DisplaySettings,
+  type PlayerMasterBar,
+  type PlayerApi,
+  type PlayerStaff,
+  type PlayerTrack,
+} from "./score-player.ts"
 
 class Emitter<T = void> {
   handlers = new Set<(value: T) => void>()
@@ -179,10 +185,7 @@ const handlerCount = (api: ReturnType<typeof fakeApi>["api"]) =>
     api.error,
     api.playbackRangeChanged,
     api.playbackRangeHighlightChanged,
-  ].reduce(
-    (sum, emitter) => sum + emitter.handlers.size,
-    0,
-  )
+  ].reduce((sum, emitter) => sum + emitter.handlers.size, 0)
 
 test("a loaded score makes the state ready, and the draw events bracket rendered", () => {
   const { api } = fakeApi()
@@ -430,7 +433,11 @@ test("a score without a saved mixer starts each track at its file's volume", () 
 
 test("a saved mixer is fitted on load, master is applied at once, and tracks wait for playerReady", () => {
   const { api, calls } = fakeApi()
-  const saved = setMute(setSolo(setTrackVolume({ ...createMixer([1, 1, 1, 1]), master: 0.4 }, 0, 0.3), 1, true), 2, true)
+  const saved = setMute(
+    setSolo(setTrackVolume({ ...createMixer([1, 1, 1, 1]), master: 0.4 }, 0, 0.3), 1, true),
+    2,
+    true,
+  )
   const heard: unknown[] = []
   const player = createScorePlayer(api, { mixer: saved, onMixerChange: (mixer) => heard.push(mixer) })
   api.scoreLoaded.emit({ tempo: 120, tracks: SCORE_TRACKS })

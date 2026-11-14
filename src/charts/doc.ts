@@ -97,7 +97,9 @@ export function segments(line: Extract<DocLine, { kind: "lyrics" }>): ReadonlyAr
   const breaks = [...starts].sort((a, b) => a - b)
   return breaks.map((start, i) => {
     const end = breaks[i + 1] ?? line.text.length
-    const chords = line.chords.flatMap((c, index) => (c.at >= start && (c.at < end || (i === breaks.length - 1 && c.at === end)) ? [index] : []))
+    const chords = line.chords.flatMap((c, index) =>
+      c.at >= start && (c.at < end || (i === breaks.length - 1 && c.at === end)) ? [index] : [],
+    )
     return { start, end, chords }
   })
 }
@@ -117,9 +119,10 @@ export function placeChord(doc: ChartDoc, lineIndex: number, at: number, chord: 
 
   const index = existing >= 0 ? existing : line.chords.filter((c) => c.at < column).length
   const from = lineStart(doc, lineIndex) + chordOffset(line, index, column)
-  const chords = existing >= 0
-    ? line.chords.map((c, i) => (i === existing ? { at: column, chord } : c))
-    : [...line.chords.slice(0, index), { at: column, chord }, ...line.chords.slice(index)]
+  const chords =
+    existing >= 0
+      ? line.chords.map((c, i) => (i === existing ? { at: column, chord } : c))
+      : [...line.chords.slice(0, index), { at: column, chord }, ...line.chords.slice(index)]
   const replaced = existing >= 0 ? line.chords[existing]!.chord.length + 2 : 0
   return {
     doc: replaceLine(doc, lineIndex, { ...line, chords }),
@@ -180,13 +183,21 @@ export function editLine(doc: ChartDoc, lineIndex: number, text: string): Edit {
   // with the text after it; a chord on text being replaced stays at its start.
   const chords = line.chords.map((c) => ({
     ...c,
-    at: c.at < keep.prefix || (c.at === keep.prefix && replacedEnd > keep.prefix) ? c.at : c.at >= replacedEnd ? c.at + shift : keep.prefix,
+    at:
+      c.at < keep.prefix || (c.at === keep.prefix && replacedEnd > keep.prefix)
+        ? c.at
+        : c.at >= replacedEnd
+          ? c.at + shift
+          : keep.prefix,
   }))
   const next = { ...line, text, chords }
   const edited = replaceLine(doc, lineIndex, next)
   const [change] = commonEnds(anchorLine(line), anchorLine(next)).change
   const base = lineStart(doc, lineIndex)
-  return { doc: edited, changes: change ? [{ from: base + change.from, to: base + change.to, insert: change.insert }] : [] }
+  return {
+    doc: edited,
+    changes: change ? [{ from: base + change.from, to: base + change.to, insert: change.insert }] : [],
+  }
 }
 
 /** Adds an empty lyric line after `lineIndex`. */
@@ -206,7 +217,8 @@ export function insertLineAfter(doc: ChartDoc, lineIndex: number): Edit {
  */
 export function deleteLine(doc: ChartDoc, lineIndex: number): Edit {
   const line = doc[lineIndex]
-  const oneLine = line !== undefined && (line.kind === "literal" || line.kind === "lyrics" || directiveName(line) === "score")
+  const oneLine =
+    line !== undefined && (line.kind === "literal" || line.kind === "lyrics" || directiveName(line) === "score")
   if (!oneLine) throw new Error(`line ${lineIndex} is not a lyric, literal or score link line`)
   return removeLineAt(doc, lineIndex)
 }
@@ -259,7 +271,10 @@ export function removeSection(doc: ChartDoc, lineIndex: number): Edit {
   const block = sectionBlock(doc, lineIndex)
   if (isLiteralStart(directiveName(doc[lineIndex]!))) {
     const last = block.closed ? block.end : lineIndex + countLiteral(doc, lineIndex + 1)
-    return chain(doc, Array.from({ length: last - lineIndex + 1 }, () => (d: ChartDoc) => removeLineAt(d, lineIndex)))
+    return chain(
+      doc,
+      Array.from({ length: last - lineIndex + 1 }, () => (d: ChartDoc) => removeLineAt(d, lineIndex)),
+    )
   }
   const steps = [(d: ChartDoc) => removeLineAt(d, block.end), (d: ChartDoc) => removeLineAt(d, block.start)]
   return chain(doc, block.closed ? steps : steps.slice(1))
@@ -303,8 +318,12 @@ export function addPhrase(doc: ChartDoc, lineIndex: number, name: string, tex: s
   const atEnd = open !== null && next !== undefined && directiveName(next) === `end_of_${open.kind}`
   const at = atEnd ? lineIndex + 2 : lineIndex + 1
   const block = [directive("start_of_textblock", cleanLabel(name)), ...literalLines(tex), directive("end_of_textblock")]
-  const split = open && !atEnd ? [directive(`end_of_${open.kind}`), ...block, directive(`start_of_${open.kind}`)] : block
-  return chain(doc, split.map((line, i) => (d: ChartDoc) => insertLineAt(d, at + i, line)))
+  const split =
+    open && !atEnd ? [directive(`end_of_${open.kind}`), ...block, directive(`start_of_${open.kind}`)] : block
+  return chain(
+    doc,
+    split.map((line, i) => (d: ChartDoc) => insertLineAt(d, at + i, line)),
+  )
 }
 
 /** Gives the phrase whose start line is at `lineIndex` a new name and new alphaTex. */
@@ -427,13 +446,19 @@ export function moveBlock(doc: ChartDoc, lineIndex: number, delta: -1 | 1): Edit
 export function duplicateBlock(doc: ChartDoc, lineIndex: number): Edit {
   const { start, end } = blockRange(doc, lineIndex)
   const lines = doc.slice(start, end + 1)
-  return chain(doc, lines.map((line, i) => (d: ChartDoc) => insertLineAt(d, end + 1 + i, line)))
+  return chain(
+    doc,
+    lines.map((line, i) => (d: ChartDoc) => insertLineAt(d, end + 1 + i, line)),
+  )
 }
 
 /** Deletes the block at `lineIndex`: for a section, its lines too. */
 export function deleteBlock(doc: ChartDoc, lineIndex: number): Edit {
   const { start, end } = blockRange(doc, lineIndex)
-  return chain(doc, Array.from({ length: end - start + 1 }, () => (d: ChartDoc) => removeLineAt(d, start)))
+  return chain(
+    doc,
+    Array.from({ length: end - start + 1 }, () => (d: ChartDoc) => removeLineAt(d, start)),
+  )
 }
 
 /**
@@ -506,7 +531,10 @@ function removeLineAt(doc: ChartDoc, index: number): Edit {
   const length = anchorLine(doc[index]!).length
   // The chart never holds no lines: removing the last one leaves an empty lyric line, which is what "" parses to.
   if (doc.length === 1) {
-    return { doc: [{ kind: "lyrics", text: "", chords: [] }], changes: length > 0 ? [{ from: 0, to: length, insert: 0 }] : [] }
+    return {
+      doc: [{ kind: "lyrics", text: "", chords: [] }],
+      changes: length > 0 ? [{ from: 0, to: length, insert: 0 }] : [],
+    }
   }
   const next = doc.filter((_, i) => i !== index)
   const start = lineStart(doc, index)
@@ -560,6 +588,7 @@ function commonEnds(before: string, after: string): { prefix: number; suffix: nu
   ) {
     suffix++
   }
-  const change = before === after ? [] : [{ from: prefix, to: before.length - suffix, insert: after.length - prefix - suffix }]
+  const change =
+    before === after ? [] : [{ from: prefix, to: before.length - suffix, insert: after.length - prefix - suffix }]
   return { prefix, suffix, change }
 }

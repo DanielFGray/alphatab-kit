@@ -34,10 +34,7 @@ import type { KeyPress } from "./keyboard.ts"
  * The controller sets the staves' notation on it, so a score shared between views shows the same notation in each.
  */
 export type ScoreSource =
-  | { readonly bytes: Uint8Array }
-  | { readonly url: string }
-  | { readonly tex: string }
-  | { readonly score: model.Score }
+  { readonly bytes: Uint8Array } | { readonly url: string } | { readonly tex: string } | { readonly score: model.Score }
 
 /** The speed trainer's settings. Each finished loop of the passage counts; after `loopCount` counts the speed steps up. */
 export interface TrainerState {
@@ -476,8 +473,7 @@ export function createScorePlayer(
   }
 
   // The selection changes the passage, so the tempo changes with it.
-  const setSelection = (selection: BeatSpan | null) =>
-    update({ selection, tempo: tempoAt(state.speed, selection) })
+  const setSelection = (selection: BeatSpan | null) => update({ selection, tempo: tempoAt(state.speed, selection) })
 
   // Sets the speed in the API and the state. The trainer's loop count is the caller's to handle.
   const applySpeed = (speed: number) => {

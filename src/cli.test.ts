@@ -21,7 +21,10 @@ test("syncPatch copies the kit's patch, pins alphaTab and drops the old patch", 
   const version = kitFile!.slice("alphatab-".length, -".patch".length)
   const old = "patches/@coderline%2Falphatab@0.0.1.patch"
   const dir = await app(
-    { dependencies: { "@coderline/alphatab": "0.0.1" }, patchedDependencies: { "@coderline/alphatab@0.0.1": old, "other@1": "patches/other.patch" } },
+    {
+      dependencies: { "@coderline/alphatab": "0.0.1" },
+      patchedDependencies: { "@coderline/alphatab@0.0.1": old, "other@1": "patches/other.patch" },
+    },
     { [old]: "old" },
   )
 
@@ -31,7 +34,12 @@ test("syncPatch copies the kit's patch, pins alphaTab and drops the old patch", 
 
   const pkg = JSON.parse(await readFile(path.join(dir, "package.json"), "utf8"))
   expect(pkg.dependencies["@coderline/alphatab"]).toBe(version)
-  expect(pkg.patchedDependencies).toEqual({ "other@1": "patches/other.patch", [`@coderline/alphatab@${version}`]: `patches/@coderline%2Falphatab@${version}.patch` })
+  expect(pkg.patchedDependencies).toEqual({
+    "other@1": "patches/other.patch",
+    [`@coderline/alphatab@${version}`]: `patches/@coderline%2Falphatab@${version}.patch`,
+  })
   expect(await readdir(path.join(dir, "patches"))).toEqual([`@coderline%2Falphatab@${version}.patch`])
-  expect(await readFile(path.join(dir, "patches", `@coderline%2Falphatab@${version}.patch`), "utf8")).toBe(await readFile(path.join(kitPatches, kitFile!), "utf8"))
+  expect(await readFile(path.join(dir, "patches", `@coderline%2Falphatab@${version}.patch`), "utf8")).toBe(
+    await readFile(path.join(kitPatches, kitFile!), "utf8"),
+  )
 })

@@ -1,12 +1,23 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { addSection, anchorText, parseDoc, renameSection, serializeDoc } from "./doc.ts"
-import { chartChords, exportChords, importPasted, isChordName, isTabLine, renderLyrics, suggestedChords, type ChartItem } from "./lyrics.ts"
+import {
+  chartChords,
+  exportChords,
+  importPasted,
+  isChordName,
+  isTabLine,
+  renderLyrics,
+  suggestedChords,
+  type ChartItem,
+} from "./lyrics.ts"
 
 const pasted = readFileSync(new URL("../../test/fixtures/amazing-grace.txt", import.meta.url), "utf8")
 
 const pairs = (key?: string) =>
-  renderLyrics(importPasted(pasted, "G"), key).flatMap((line) => line.filter((i): i is Extract<ChartItem, { kind: "pair" }> => i.kind === "pair"))
+  renderLyrics(importPasted(pasted, "G"), key).flatMap((line) =>
+    line.filter((i): i is Extract<ChartItem, { kind: "pair" }> => i.kind === "pair"),
+  )
 
 const CHORD = /^[A-G][#b]?(m|maj|min|dim|aug|sus)?\d*(\/[A-G][#b]?)?$/
 
@@ -24,8 +35,12 @@ describe("chartChords", () => {
 
 describe("importPasted", () => {
   test("keeps every lyric line exactly", () => {
-    const lyrics = pasted.split("\n").filter((l) => l.trim() && !l.startsWith("[") && !/^[A-G][A-Za-z0-9#/ ]*$/.test(l.trim()))
-    const shown = renderLyrics(importPasted(pasted, "G")).map((line) => line.map((i) => (i.kind === "pair" ? i.lyric : "")).join(""))
+    const lyrics = pasted
+      .split("\n")
+      .filter((l) => l.trim() && !l.startsWith("[") && !/^[A-G][A-Za-z0-9#/ ]*$/.test(l.trim()))
+    const shown = renderLyrics(importPasted(pasted, "G")).map((line) =>
+      line.map((i) => (i.kind === "pair" ? i.lyric : "")).join(""),
+    )
     for (const l of lyrics) expect(shown).toContain(l.trimEnd())
   })
 
@@ -33,7 +48,13 @@ describe("importPasted", () => {
     const line = renderLyrics(importPasted(pasted, "G"))
       .map((l) => l.filter((i): i is Extract<ChartItem, { kind: "pair" }> => i.kind === "pair"))
       .find((l) => l.some((p) => p.lyric.startsWith("Amazing")))!
-    const columnOf = (chord: string) => line.slice(0, line.findIndex((p) => p.chord === chord)).reduce((n, p) => n + p.lyric.length, 0)
+    const columnOf = (chord: string) =>
+      line
+        .slice(
+          0,
+          line.findIndex((p) => p.chord === chord),
+        )
+        .reduce((n, p) => n + p.lyric.length, 0)
     // "G" and "C" were typed at columns 0 and 18 of the first line in the fixture.
     expect(columnOf("G")).toBe(0)
     expect(columnOf("C")).toBe(18)
@@ -44,16 +65,31 @@ describe("importPasted", () => {
     const shownLines = renderLyrics(importPasted(pasted, "G")).map((line) =>
       line.filter((i): i is Extract<ChartItem, { kind: "pair" }> => i.kind === "pair"),
     )
-    const byLyric = new Map(shownLines.map((l) => [l.map((p) => p.lyric).join("").trimEnd(), l]))
+    const byLyric = new Map(
+      shownLines.map((l) => [
+        l
+          .map((p) => p.lyric)
+          .join("")
+          .trimEnd(),
+        l,
+      ]),
+    )
     let checked = 0
     rows.forEach((row, index) => {
       const lyric = rows[index + 1]
-      const isChordLine = row.trim() !== "" && row.trim().split(/\s+/).every((t) => CHORD.test(t))
+      const isChordLine =
+        row.trim() !== "" &&
+        row
+          .trim()
+          .split(/\s+/)
+          .every((t) => CHORD.test(t))
       if (!isChordLine || lyric === undefined) return
       const line = byLyric.get(lyric.trimEnd())!
       expect(line).toBeDefined()
       const typed = [...row.matchAll(/\S+/g)].map((m) => ({ chord: m[0], column: m.index! }))
-      const shown = line.flatMap((p, i) => (p.chord ? [{ chord: p.chord, column: line.slice(0, i).reduce((n, q) => n + q.lyric.length, 0) }] : []))
+      const shown = line.flatMap((p, i) =>
+        p.chord ? [{ chord: p.chord, column: line.slice(0, i).reduce((n, q) => n + q.lyric.length, 0) }] : [],
+      )
       expect(shown).toEqual(typed)
       checked += typed.length
     })
@@ -61,7 +97,10 @@ describe("importPasted", () => {
   })
 
   test("turns headers into sections", () => {
-    const labels = renderLyrics(importPasted(pasted, "G")).flat().filter((i) => i.kind === "section").map((i) => (i as { label: string }).label)
+    const labels = renderLyrics(importPasted(pasted, "G"))
+      .flat()
+      .filter((i) => i.kind === "section")
+      .map((i) => (i as { label: string }).label)
     expect(labels).toEqual(["Verse 1", "Chorus", "Verse 2", "Chorus"])
   })
 
@@ -72,7 +111,14 @@ describe("importPasted", () => {
 
 describe("renderLyrics", () => {
   test("transposes every chord by the interval between keys", () => {
-    const chords = (key?: string) => [...new Set(pairs(key).map((p) => p.chord).filter(Boolean))].sort()
+    const chords = (key?: string) =>
+      [
+        ...new Set(
+          pairs(key)
+            .map((p) => p.chord)
+            .filter(Boolean),
+        ),
+      ].sort()
     expect(chords()).toEqual(["C", "D", "Em", "G"])
     expect(chords("A")).toEqual(["A", "D", "E", "F#m"])
   })
@@ -108,7 +154,10 @@ describe("item ranges", () => {
   })
 
   test("ranges do not change when the chart is shown in another key", () => {
-    const ranges = (key?: string) => renderLyrics(source, key).flat().map((i) => [i.start, i.end])
+    const ranges = (key?: string) =>
+      renderLyrics(source, key)
+        .flat()
+        .map((i) => [i.start, i.end])
     expect(ranges("Bb")).toEqual(ranges())
   })
 })
@@ -121,7 +170,11 @@ describe("exportChords", () => {
     const at = rows.indexOf("Amazing grace, how sweet the sound")
     expect(at).toBeGreaterThan(0)
     // Each chord stands over the column of the word it was placed on.
-    expect([...rows[at - 1]!.matchAll(/\S+/g)].map((m) => [m[0], m.index])).toEqual([["G", 0], ["C", 18], ["G", 28]])
+    expect([...rows[at - 1]!.matchAll(/\S+/g)].map((m) => [m[0], m.index])).toEqual([
+      ["G", 0],
+      ["C", 18],
+      ["G", 28],
+    ])
     expect(rows[0]).toBe("[Verse 1]")
   })
 
@@ -134,7 +187,9 @@ describe("exportChords", () => {
     expect(inA).toContain("A")
     expect(inA).not.toMatch(/^\s*G\b/m)
     expect(importPasted(inA, "A")).toBe(importPasted(exportChords(stored, "A"), "A"))
-    expect(renderLyrics(importPasted(inA, "A"))[2]).toEqual(renderLyrics(stored, "A")[2]!.map((i) => ({ ...i, start: expect.any(Number), end: expect.any(Number) })))
+    expect(renderLyrics(importPasted(inA, "A"))[2]).toEqual(
+      renderLyrics(stored, "A")[2]!.map((i) => ({ ...i, start: expect.any(Number), end: expect.any(Number) })),
+    )
   })
 
   test("chords that touch are kept apart, a chord-only line stays apart from the words below, and a blank line stays", () => {
@@ -153,7 +208,8 @@ describe("tab", () => {
   test("recognises tab lines and nothing else in a chart", () => {
     expect(tabRows).toHaveLength(10)
     expect(pasted.split("\n").filter(isTabLine)).toEqual([])
-    for (const lyric of ["Well - I - don't - know", "----", "Oh-oh-oh-oh-oh", "G - C - D"]) expect(isTabLine(lyric)).toBe(false)
+    for (const lyric of ["Well - I - don't - know", "----", "Oh-oh-oh-oh-oh", "G - C - D"])
+      expect(isTabLine(lyric)).toBe(false)
   })
 
   test("a tab run becomes a tab section kept exactly, with the chord row above it", () => {
@@ -172,14 +228,19 @@ describe("tab", () => {
   test("tab lines are drawn as written, in any key, and nothing in them is a chord", () => {
     for (const key of [undefined, "A"]) {
       const shown = renderLyrics(stored, key).flat()
-      expect(shown.filter((i) => i.kind === "tab").map((i) => (i as { text: string }).text)).toEqual([rows[1]!.trimEnd(), ...tabRows])
+      expect(shown.filter((i) => i.kind === "tab").map((i) => (i as { text: string }).text)).toEqual([
+        rows[1]!.trimEnd(),
+        ...tabRows,
+      ])
       expect(shown.some((i) => i.kind === "pair" && i.chord.includes("12"))).toBe(false)
     }
   })
 
   test("a tab section shown in another key says its tab is as written", () => {
     const tabSections = (key?: string) =>
-      renderLyrics(stored, key).flat().filter((i): i is Extract<ChartItem, { kind: "section" }> => i.kind === "section" && i.label !== "Verse 1")
+      renderLyrics(stored, key)
+        .flat()
+        .filter((i): i is Extract<ChartItem, { kind: "section" }> => i.kind === "section" && i.label !== "Verse 1")
     expect(tabSections().map((s) => s.writtenIn)).toEqual([undefined, undefined, undefined])
     expect(tabSections("A").map((s) => s.writtenIn)).toEqual(["G", "G", "G"])
   })
@@ -212,7 +273,12 @@ describe("phrases", () => {
 
   test("a phrase is one drawn line holding its name and notation, and nothing in it is a chord", () => {
     const lines = renderLyrics(stored)
-    expect(lines.map((line) => line.map((item) => item.kind))).toEqual([["section"], ["pair", "pair"], ["phrase"], ["pair", "pair"]])
+    expect(lines.map((line) => line.map((item) => item.kind))).toEqual([
+      ["section"],
+      ["pair", "pair"],
+      ["phrase"],
+      ["pair", "pair"],
+    ])
     expect(lines[2]![0]).toMatchObject({ kind: "phrase", name: "Intro riff", tex })
   })
 

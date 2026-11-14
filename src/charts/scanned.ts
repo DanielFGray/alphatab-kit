@@ -76,10 +76,21 @@ export function wordsFromTesseract(tsv: string): Array<WordBox> {
  */
 export function wordsFromPdf(xhtml: string): Array<WordBox> {
   const words: Array<WordBox> = []
-  for (const [index, page] of xhtml.split(/<page\b/).slice(1).entries()) {
+  for (const [index, page] of xhtml
+    .split(/<page\b/)
+    .slice(1)
+    .entries()) {
     const lines: Array<{ top: number; bottom: number }> = []
-    const boxes = [...page.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g)]
-      .map((m) => ({ text: decodeXml(m[5]!).trim(), left: Number(m[1]), top: Number(m[2]), right: Number(m[3]), bottom: Number(m[4]) }))
+    const boxes = [
+      ...page.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g),
+    ]
+      .map((m) => ({
+        text: decodeXml(m[5]!).trim(),
+        left: Number(m[1]),
+        top: Number(m[2]),
+        right: Number(m[3]),
+        bottom: Number(m[4]),
+      }))
       .filter((box) => box.text !== "")
     for (const box of boxes.toSorted((a, b) => a.top - b.top)) {
       const middle = (box.top + box.bottom) / 2
@@ -135,12 +146,20 @@ function layoutPage(lines: ReadonlyArray<Line>): string {
     if (!isChordLine(textOf(line))) {
       out.push(line.words.map((w) => fixLyricWord(w.text)).join(" "))
     } else if (next && next.top - line.top <= pitch * 1.5 && !isChordLine(textOf(next))) {
-      out.push(chordRow(line.words.map((chord) => ({ chord: chord.text, column: columnUnder(chord.left, next.words, charWidth) }))))
+      out.push(
+        chordRow(
+          line.words.map((chord) => ({ chord: chord.text, column: columnUnder(chord.left, next.words, charWidth) })),
+        ),
+      )
       out.push(next.words.map((w) => fixLyricWord(w.text)).join(" "))
       i++
     } else {
       // A chord-only line (an intro or turnaround) has no lyrics to line up with, so keep its spacing.
-      out.push(chordRow(line.words.map((chord) => ({ chord: chord.text, column: Math.round((chord.left - margin) / charWidth) }))))
+      out.push(
+        chordRow(
+          line.words.map((chord) => ({ chord: chord.text, column: Math.round((chord.left - margin) / charWidth) })),
+        ),
+      )
     }
   }
   return out.join("\n")
@@ -182,7 +201,9 @@ function fixLyricWord(word: string): string {
 
 function decodeXml(text: string): string {
   return text.replace(/&(amp|lt|gt|quot|apos|#\d+);/g, (_, name: string) =>
-    name.startsWith("#") ? String.fromCodePoint(Number(name.slice(1))) : { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name]!,
+    name.startsWith("#")
+      ? String.fromCodePoint(Number(name.slice(1)))
+      : { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name]!,
   )
 }
 

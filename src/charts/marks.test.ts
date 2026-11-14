@@ -29,17 +29,27 @@ describe("markResolver", () => {
 
   test("follows a mark through every later revision, and orphans it when its line is deleted", () => {
     const sweet = text.indexOf("sweet")
-    expect(resolve({ revision_id: "r1", range_start: sweet, range_end: sweet + 5 })).toEqual({ state: "orphaned", reason: "deleted" })
+    expect(resolve({ revision_id: "r1", range_start: sweet, range_end: sweet + 5 })).toEqual({
+      state: "orphaned",
+      reason: "deleted",
+    })
     expect(resolve({ revision_id: "r1", ...grace }).state).toBe("kept")
   })
 
   test("a mark on a revision that is not in the list is orphaned", () => {
-    expect(resolve({ revision_id: "missing", range_start: 0, range_end: 3 })).toEqual({ state: "orphaned", reason: "deleted" })
+    expect(resolve({ revision_id: "missing", range_start: 0, range_end: 3 })).toEqual({
+      state: "orphaned",
+      reason: "deleted",
+    })
   })
 })
 
 describe("ink geometry", () => {
-  const stroke = [[0, 0, 0.5], [10, 5, 0.5], [20, 0, 0.5]] as const
+  const stroke = [
+    [0, 0, 0.5],
+    [10, 5, 0.5],
+    [20, 0, 0.5],
+  ] as const
 
   test("bounds cover every point", () => {
     expect(boundsOf([stroke])).toEqual({ x: 0, y: 0, w: 20, h: 5 })

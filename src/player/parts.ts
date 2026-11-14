@@ -12,6 +12,9 @@ export type Parts<Slot extends string> = Partial<Record<Slot, PartProps>>
  * The props a control puts on one of its parts: the app's props for that slot,
  * then `data-part` naming the slot, so a test or stylesheet can find it by name.
  */
-export function partProps<Slot extends string>(parts: Parts<Slot> | undefined, slot: Slot): PartProps & { "data-part": Slot } {
+export function partProps<Slot extends string>(
+  parts: Parts<Slot> | undefined,
+  slot: Slot,
+): PartProps & { "data-part": Slot } {
   return { ...parts?.[slot], "data-part": slot }
 }

@@ -60,11 +60,17 @@ const BAR_WIDTH = 8
  * lines for the chords no syllable takes. A chord equal to the one before it
  * is not written again, except as a chord-only line's first chord in a bar.
  */
-function layout(played: ReadonlyArray<Played>, chords: ReadonlyArray<ChordAt>, lines: ReadonlyArray<ReadonlyArray<Syllable>>): string {
+function layout(
+  played: ReadonlyArray<Played>,
+  chords: ReadonlyArray<ChordAt>,
+  lines: ReadonlyArray<ReadonlyArray<Syllable>>,
+): string {
   const out: Array<string> = []
   let ci = 0
   let lastChord: string | null = null
-  const sections = played.filter((p) => p.bar.section?.text.trim()).map((p) => ({ at: p.at, label: p.bar.section!.text.trim() }))
+  const sections = played
+    .filter((p) => p.bar.section?.text.trim())
+    .map((p) => ({ at: p.at, label: p.bar.section!.text.trim() }))
   let si = 0
   const sectionsBefore = (t: number) => {
     for (; si < sections.length && sections[si]!.at <= t; si++) {
@@ -180,10 +186,12 @@ function spelledInKey(heard: ReturnType<typeof inferChords>): { chords: Array<Ch
 }
 
 function keyOf(chords: ReadonlyArray<ChordAt>): MusicalKey | null {
-  return keyOfChords(chords.flatMap((c) => {
-    const s = spell(c.name)
-    return s ? [{ root: s.root, minor: s.tones.get(3) === 3 }] : []
-  }))
+  return keyOfChords(
+    chords.flatMap((c) => {
+      const s = spell(c.name)
+      return s ? [{ root: s.root, minor: s.tones.get(3) === 3 }] : []
+    }),
+  )
 }
 
 /** The track with the most beats that carry a syllable, or -1 when none does. */
@@ -191,7 +199,9 @@ function lyricTrack(score: model.Score): number {
   let best = -1
   let most = 0
   for (const track of score.tracks) {
-    const n = track.staves.flatMap((s) => s.bars.flatMap((b) => b.voices.flatMap((v) => v.beats))).filter((b) => b.lyrics?.some(Boolean)).length
+    const n = track.staves
+      .flatMap((s) => s.bars.flatMap((b) => b.voices.flatMap((v) => v.beats)))
+      .filter((b) => b.lyrics?.some(Boolean)).length
     if (n > most) {
       most = n
       best = track.index
@@ -255,7 +265,12 @@ function fit(line: ReadonlyArray<Syllable>): Array<ReadonlyArray<Syllable>> {
   for (let k = 1; k < line.length; k++) {
     if (line[k - 1]!.text.endsWith("-")) continue
     // On equal rests, the split nearer the middle leaves two lines of even length.
-    if (best < 0 || gap(k) > gap(best) || (gap(k) === gap(best) && Math.abs(k - line.length / 2) < Math.abs(best - line.length / 2))) best = k
+    if (
+      best < 0 ||
+      gap(k) > gap(best) ||
+      (gap(k) === gap(best) && Math.abs(k - line.length / 2) < Math.abs(best - line.length / 2))
+    )
+      best = k
   }
   return best < 0 ? [line] : [...fit(line.slice(0, best)), ...fit(line.slice(best))]
 }
@@ -271,7 +286,10 @@ function beatsOf(score: model.Score, barIndex: number): Array<model.Beat> {
 
 /** The index in `played` of the bar sounding at tick `at`. */
 function playedIndexAt(played: ReadonlyArray<Played>, at: number): number {
-  return Math.max(0, played.findLastIndex((p) => p.at <= at))
+  return Math.max(
+    0,
+    played.findLastIndex((p) => p.at <= at),
+  )
 }
 
 function barLength(played: ReadonlyArray<Played>, at: number): number {
@@ -280,6 +298,7 @@ function barLength(played: ReadonlyArray<Played>, at: number): number {
 
 function chordRow(chords: ReadonlyArray<{ chord: string; column: number }>): string {
   let row = ""
-  for (const { chord, column } of chords) row = row.padEnd(row === "" ? column : Math.max(column, row.length + 1)) + chord
+  for (const { chord, column } of chords)
+    row = row.padEnd(row === "" ? column : Math.max(column, row.length + 1)) + chord
   return row
 }
