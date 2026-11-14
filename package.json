@@ -32,6 +32,10 @@
     "./player/*": {
       "types": "./dist/player/*.d.ts",
       "default": "./dist/player/*.js"
+    },
+    "./click/*": {
+      "types": "./dist/click/*.d.ts",
+      "default": "./dist/click/*.js"
     }
   },
   "scripts": {
