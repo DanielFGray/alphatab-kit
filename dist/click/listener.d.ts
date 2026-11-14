@@ -120,3 +120,11 @@ export declare class Listener {
     private fineIndexAt;
     private coarseFramesIn;
 }
+/**
+ * A note is the largest rise from PEAK_BEFORE_SECONDS before it to this long
+ * after it, and a rise this soon after a note is part of that note. A strum or
+ * a slow attack rises for up to about 60 ms; 16th notes at 200 BPM are 75 ms
+ * apart. The reference looks 50 ms ahead and merges 30 ms, which splits a strum
+ * into two notes.
+ */
+export declare const MERGE_SECONDS = 0.07;

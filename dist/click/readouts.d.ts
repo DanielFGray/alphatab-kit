@@ -1,8 +1,8 @@
 import { type Parts } from "../player/parts.ts";
 import { type Hit } from "./timing.ts";
 export type OffsetChartProps = {
-    /** `UseClickTrack.hits`. */
-    hits: ReadonlyArray<Hit>;
+    /** The notes in the order played: `UseClickTrack.hits`, or the paired notes of a score take. */
+    hits: ReadonlyArray<Pick<Hit, "offsetMs">>;
     /** The drawing's height in CSS pixels; it fills its container's width. */
     height?: number;
     parts?: Parts<"root" | "band" | "zero" | "mark" | "label">;
@@ -15,7 +15,7 @@ export type OffsetChartProps = {
  */
 export declare function OffsetChart({ hits, height, parts }: OffsetChartProps): import("react").JSX.Element;
 export type TakeSummaryProps = {
-    hits: ReadonlyArray<Hit>;
+    hits: ReadonlyArray<Pick<Hit, "offsetMs">>;
     parts?: Parts<"root" | "item" | "label" | "value">;
 };
 /** The take's notes in four numbers: how many, their average offset, their spread and the share within ±TIGHT_MS. */

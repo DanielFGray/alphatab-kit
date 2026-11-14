@@ -3,8 +3,8 @@ import { chartRangeMs, hitTiles, meterFill, signedMs } from "./report.ts"
 import { type Hit, TIGHT_MS } from "./timing.ts"
 
 export type OffsetChartProps = {
-  /** `UseClickTrack.hits`. */
-  hits: ReadonlyArray<Hit>
+  /** The notes in the order played: `UseClickTrack.hits`, or the paired notes of a score take. */
+  hits: ReadonlyArray<Pick<Hit, "offsetMs">>
   /** The drawing's height in CSS pixels; it fills its container's width. */
   height?: number
   parts?: Parts<"root" | "band" | "zero" | "mark" | "label">
@@ -74,7 +74,7 @@ export function OffsetChart({ hits, height = 120, parts }: OffsetChartProps) {
 const PAD = 10
 
 export type TakeSummaryProps = {
-  hits: ReadonlyArray<Hit>
+  hits: ReadonlyArray<Pick<Hit, "offsetMs">>
   parts?: Parts<"root" | "item" | "label" | "value">
 }
 

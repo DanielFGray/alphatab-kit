@@ -36,4 +36,4 @@ export interface Summary {
     readonly tight: number;
 }
 export declare const TIGHT_MS = 10;
-export declare const summarize: (hits: ReadonlyArray<Hit>) => Summary;
+export declare const summarize: (hits: ReadonlyArray<Pick<Hit, "offsetMs">>) => Summary;

@@ -324,7 +324,7 @@ const MEDIAN_WEIGHT = 2
  * apart. The reference looks 50 ms ahead and merges 30 ms, which splits a strum
  * into two notes.
  */
-const MERGE_SECONDS = 0.07
+export const MERGE_SECONDS = 0.07
 /**
  * Before the log, the loudest band of the last LEVEL_SECONDS is scaled to this
  * magnitude. Between about 20 and 100 the same notes are found. Much lower,

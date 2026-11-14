@@ -69,7 +69,7 @@ export interface Summary {
 
 export const TIGHT_MS = 10
 
-export const summarize = (hits: ReadonlyArray<Hit>): Summary => {
+export const summarize = (hits: ReadonlyArray<Pick<Hit, "offsetMs">>): Summary => {
   const count = hits.length
   if (count === 0) return { count, meanMs: 0, spreadMs: 0, tight: 0 }
   const meanMs = hits.reduce((sum, hit) => sum + hit.offsetMs, 0) / count

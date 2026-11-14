@@ -25,7 +25,7 @@ export const takeStatus = (take: Take, running: boolean, beatsPerBar: number): s
 }
 
 /** The summary of a take's notes: a label and a value each. */
-export const hitTiles = (hits: ReadonlyArray<Hit>): ReadonlyArray<readonly [string, string]> => {
+export const hitTiles = (hits: ReadonlyArray<Pick<Hit, "offsetMs">>): ReadonlyArray<readonly [string, string]> => {
   const summary = summarize(hits)
   const none = summary.count === 0
   return [
@@ -60,7 +60,7 @@ export const meterFill = (peak: number): number =>
  * How far either side of 0 the offset chart reaches, in ms: twice the tight
  * band at least, and otherwise the widest offset rounded up to 10 ms.
  */
-export const chartRangeMs = (hits: ReadonlyArray<Hit>): number =>
+export const chartRangeMs = (hits: ReadonlyArray<Pick<Hit, "offsetMs">>): number =>
   Math.max(2 * TIGHT_MS, Math.ceil(Math.max(0, ...hits.map((hit) => Math.abs(hit.offsetMs))) / 10) * 10)
 
 const tendency = (meanMs: number): string => (Math.abs(meanMs) < 2 ? "centred" : meanMs < 0 ? "rushing" : "dragging")

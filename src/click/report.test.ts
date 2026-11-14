@@ -59,5 +59,5 @@ test("the mic meter runs from -60 dBFS to full scale", () => {
 
 test("the offset chart reaches twice the tight band, or past the widest note in 10 ms steps", () => {
   expect(chartRangeMs([])).toBe(20)
-  expect(chartRangeMs([{ offsetMs: -34, beat: 0, step: 0 }])).toBe(40)
+  expect(chartRangeMs([{ offsetMs: -34 }])).toBe(40)
 })
