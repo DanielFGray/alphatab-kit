@@ -23,10 +23,15 @@ import type { Plugin } from "vite";
 export declare function alphaTabAssets(): Plugin;
 /**
  * Points alphaTab's worker and worklet URLs at `dir`. alphaTab builds them as
- * `alphaTabUrl("./alphaTab.worker.mjs", import.meta.url)`; an absolute path in
+ * `new URL("./alphaTab.worker.mjs", import.meta.url)`; an absolute path in
  * place of the relative one makes them independent of where the bundle puts
- * alphaTab's module. Throws when a URL is missing, so an alphaTab release that
- * changes how it starts workers fails the build instead of the player.
+ * alphaTab's module. The base becomes `"" + import.meta.url`, the form Vite
+ * writes in its own output: Vite's worker plugin bundles any
+ * `new Worker(new URL("<literal>", import.meta.url))`, and would look for the
+ * absolute path in the public folder, where these files never are.
+ *
+ * Throws when a URL is missing, so an alphaTab release that changes how it
+ * starts workers fails the build instead of the player.
  */
 export declare function rewriteWorkerUrls(code: string, dir: string): string;
 /**
