@@ -56,7 +56,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@coderline/alphatab": "1.9.0-alpha.1891",
+    "@coderline/alphatab": "1.9.0",
     "@effect/tsgo": "0.67.7",
     "@happy-dom/global-registrator": "21.0.4",
     "@types/bun": "^1.4.4",
@@ -91,6 +91,6 @@
     "perfect-freehand": "1.2.3"
   },
   "patchedDependencies": {
-    "@coderline/alphatab@1.9.0-alpha.1891": "patches/alphatab-1.9.0-alpha.1891.patch"
+    "@coderline/alphatab@1.9.0": "patches/alphatab-1.9.0.patch"
   }
 }

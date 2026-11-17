@@ -98,6 +98,7 @@ function playScore(score: model.Score, track: number) {
     addBend: () => {},
     finishTrack: () => {},
     addTickShift: () => {},
+    addMetronome: () => {},
   })
   generator.generate()
   return { notes, tempos, masterBars: generator.tickLookup.masterBars }

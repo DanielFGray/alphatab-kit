@@ -30,7 +30,7 @@ dfg.rocks and setlist both accept this condition.
 
 ## Libraries with conditions beyond MIT
 
-- **alphaTab** (`@coderline/alphatab` 1.9.0-alpha.1891): draws and plays scores and phrases. The kit's one patch, `patches/alphatab-1.9.0-alpha.1891.patch`, changes alphaTab's `dist/`. `src/cli.ts` copies it into a consumer's `patches/` and pins alphaTab to that version. MPL-2.0. <https://alphatab.net>
+- **alphaTab** (`@coderline/alphatab` 1.9.0): draws and plays scores and phrases. The kit's one patch, `patches/alphatab-1.9.0.patch`, changes alphaTab's `dist/`. `src/cli.ts` copies it into a consumer's `patches/` and pins alphaTab to that version. MPL-2.0. <https://alphatab.net>
 - **ChordSheetJS** (18.0.0): parses, transposes and formats stored ChordPro in `src/charts/lyrics.ts`. GPL-2.0-only. See the license condition above. <https://github.com/martijnversluis/ChordSheetJS>
 - **diff-match-patch** (1.0.5): maps a player's marks through later chart revisions (`src/charts/follow.ts`). Apache-2.0. <https://github.com/JackuB/diff-match-patch>
 

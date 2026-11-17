@@ -69,6 +69,7 @@ function playScore(score, track) {
         addBend: () => { },
         finishTrack: () => { },
         addTickShift: () => { },
+        addMetronome: () => { },
     });
     generator.generate();
     return { notes, tempos, masterBars: generator.tickLookup.masterBars };

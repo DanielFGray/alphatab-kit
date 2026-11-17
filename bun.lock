@@ -10,7 +10,7 @@
         "perfect-freehand": "1.2.3",
       },
       "devDependencies": {
-        "@coderline/alphatab": "1.9.0-alpha.1891",
+        "@coderline/alphatab": "1.9.0",
         "@effect/tsgo": "0.67.7",
         "@happy-dom/global-registrator": "21.0.4",
         "@types/bun": "^1.4.4",
@@ -40,10 +40,10 @@
     },
   },
   "patchedDependencies": {
-    "@coderline/alphatab@1.9.0-alpha.1891": "patches/alphatab-1.9.0-alpha.1891.patch",
+    "@coderline/alphatab@1.9.0": "patches/alphatab-1.9.0.patch",
   },
   "packages": {
-    "@coderline/alphatab": ["@coderline/alphatab@1.9.0-alpha.1891", "", {}, "sha512-xNFwkKFcB9C8Kx0fY2pQmFgEG4vb6j2V3VVXlDQDoWwBpO3GbmHd2kxVsisFr64vMqEDo577ZUifWkad0sFPZg=="],
+    "@coderline/alphatab": ["@coderline/alphatab@1.9.0", "", { "peerDependencies": { "@coderline/alphatab-vite": "^1.9.0", "@coderline/alphatab-webpack": "^1.9.0" }, "optionalPeers": ["@coderline/alphatab-vite", "@coderline/alphatab-webpack"] }, "sha512-pG/Um03DdiTW7i9KR+rPTRRnzIW5oJBWs67altBXtCkxGvUG1RuvkgRTZO3GIaOD2vATjcw+5OevMZl9I2/T+Q=="],
 
     "@effect/tsgo": ["@effect/tsgo@0.67.7", "", { "optionalDependencies": { "@effect/tsgo-darwin-arm64": "0.67.7", "@effect/tsgo-darwin-x64": "0.67.7", "@effect/tsgo-linux-arm": "0.67.7", "@effect/tsgo-linux-arm64": "0.67.7", "@effect/tsgo-linux-x64": "0.67.7", "@effect/tsgo-win32-arm64": "0.67.7", "@effect/tsgo-win32-x64": "0.67.7" }, "bin": { "effect-tsgo": "dist/effect-tsgo.cjs" } }, "sha512-1OPkF+7L11BGGonHsgVgfplCqEq0AkoXWcr55hfs4KomhTdRhfSAzuHbRXWoloobVRNF3i7ZgABHm6xeJ5H9Tg=="],
 
