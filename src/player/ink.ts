@@ -16,13 +16,19 @@ export function inkFrom(settings: Settings, css: string) {
 
 /**
  * Calls `onChange` when the page's theme may have changed. An app marks its theme with a class, a `data-theme`
- * attribute or an inline style on the root element, so a change to one of them is the signal. Returns the
- * function that stops watching.
+ * attribute or an inline style on the root element, so a change to one of them is the signal. An app that follows
+ * the OS color scheme through `prefers-color-scheme` changes its colors with no attribute change, so the dark-scheme
+ * query's change event is a signal too. Returns the function that stops watching.
  */
 export function observeTheme(onChange: () => void, root: HTMLElement = document.documentElement): () => void {
   const observer = new MutationObserver(onChange)
   observer.observe(root, { attributes: true, attributeFilter: ["class", "data-theme", "style"] })
-  return () => observer.disconnect()
+  const scheme = window.matchMedia("(prefers-color-scheme: dark)")
+  scheme.addEventListener("change", onChange)
+  return () => {
+    observer.disconnect()
+    scheme.removeEventListener("change", onChange)
+  }
 }
 
 /**
