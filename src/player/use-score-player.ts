@@ -12,7 +12,7 @@ import {
   type ScoreSource,
   STANDARD_ONLY,
 } from "./score-player.ts"
-import { targetUsesKey } from "./keyboard.ts"
+import { listenForKeys } from "./keyboard.ts"
 import { inkFrom, observeTheme } from "./ink.ts"
 
 export interface UseScorePlayerOptions extends ScorePlayerOptions {
@@ -33,6 +33,11 @@ export interface UseScorePlayerOptions extends ScorePlayerOptions {
 export interface UseScorePlayer {
   /** Attach to the element alphaTab draws into. The API exists after the first commit. */
   readonly host: RefObject<HTMLDivElement | null>
+  /**
+   * Attach to the element that holds the score and the app's controls, so a shortcut works with focus on any of
+   * them. Read once, when the API is built. Unattached, the keys come from the host's parent.
+   */
+  readonly keyRoot: RefObject<HTMLDivElement | null>
   readonly state: ScorePlayerState
   readonly actions: ScorePlayerActions
 }
@@ -43,9 +48,13 @@ export interface UseScorePlayer {
  * URL or tex text, so pass the same `Uint8Array` or `Score` across renders). The other options are read when the
  * API is built, except `bars`, which redraws the score without rebuilding, and the callbacks, which are read when
  * they are called. Browser only: it reads `location`.
+ *
+ * Keys go to the player from `keyRoot`. The host's parent is the default, and it only reaches controls that
+ * share that parent: an app whose toolbar sits outside it attaches `keyRoot` to the element holding both.
  */
 export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
   const host = useRef<HTMLDivElement>(null)
+  const keyRoot = useRef<HTMLDivElement>(null)
   const [player, setPlayer] = useState<ScorePlayer | null>(null)
   const latest = useRef(options)
   latest.current = options
@@ -102,18 +111,14 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
       api.updateSettings()
       if (created.getState().status === "ready") api.render()
     })
-    // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
-    // where the app's controls live too, so a shortcut works with focus on any of them unless that control
-    // uses the key itself (targetUsesKey).
+    // The host takes focus so the keys reach it. The listener sits on the key root, or on the host's parent
+    // when the app names none.
     if (!element.hasAttribute("tabindex")) element.tabIndex = 0
-    const keys = element.parentElement ?? element
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || targetUsesKey(event.target, event.code)) return
-      if (created.handleKey(event)) event.preventDefault()
-    }
-    keys.addEventListener("keydown", onKeyDown, true)
+    const stopKeys = listenForKeys(keyRoot.current ?? element.parentElement ?? element, (event) =>
+      created.handleKey(event),
+    )
     return () => {
-      keys.removeEventListener("keydown", onKeyDown, true)
+      stopKeys()
       stopTheme()
       created.dispose()
       api.destroy()
@@ -132,7 +137,7 @@ export function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer {
     player?.getState ?? (() => INITIAL_STATE),
     () => INITIAL_STATE,
   )
-  return { host, state, actions: player ?? INERT_ACTIONS }
+  return { host, keyRoot, state, actions: player ?? INERT_ACTIONS }
 }
 
 function sourceIdentity(source: ScoreSource): readonly [string, unknown] {

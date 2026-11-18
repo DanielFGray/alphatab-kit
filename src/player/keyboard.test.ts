@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { targetUsesKey } from "./keyboard.ts"
+import { listenForKeys, targetUsesKey } from "./keyboard.ts"
 
 const make = (tag: string, attributes: Record<string, string> = {}) => {
   const element = document.createElement(tag)
@@ -48,4 +48,29 @@ test("a plain element, a link without href, a non-element target and null use no
     expect(targetUsesKey(new EventTarget(), code)).toBe(false)
     expect(targetUsesKey(null, code)).toBe(false)
   }
+})
+
+test("keys from a control outside the host's parent reach the player only when the app names the root", () => {
+  // The app's clipping box holds the score and sits beside its toolbar, so the toolbar is outside the host's parent.
+  const root = make("div")
+  const toolbar = make("button")
+  const clip = make("div")
+  const host = make("div")
+  clip.append(host)
+  root.append(toolbar, clip)
+  document.body.append(root)
+  const pressed: Array<string> = []
+  const handle = (event: KeyboardEvent) => {
+    pressed.push(event.code)
+    return true
+  }
+  const stopOnParent = listenForKeys(clip, handle)
+  toolbar.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft", bubbles: true }))
+  expect(pressed).toEqual([])
+  stopOnParent()
+  const stopOnRoot = listenForKeys(root, handle)
+  toolbar.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft", bubbles: true }))
+  expect(pressed).toEqual(["ArrowLeft"])
+  stopOnRoot()
+  root.remove()
 })

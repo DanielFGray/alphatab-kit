@@ -3,7 +3,7 @@ import { AlphaTabApi, PlayerMode, Settings } from "@coderline/alphatab";
 import { alphaTabAssetUrls } from "../index.js";
 import { createMixer } from "../charts/score-mixer.js";
 import { createScorePlayer, DEFAULT_TRAINER, STANDARD_ONLY, } from "./score-player.js";
-import { targetUsesKey } from "./keyboard.js";
+import { listenForKeys } from "./keyboard.js";
 import { inkFrom, observeTheme } from "./ink.js";
 /**
  * Builds an `AlphaTabApi` on `host`, loads `source` and returns the controller's state and actions.
@@ -11,9 +11,13 @@ import { inkFrom, observeTheme } from "./ink.js";
  * URL or tex text, so pass the same `Uint8Array` or `Score` across renders). The other options are read when the
  * API is built, except `bars`, which redraws the score without rebuilding, and the callbacks, which are read when
  * they are called. Browser only: it reads `location`.
+ *
+ * Keys go to the player from `keyRoot`. The host's parent is the default, and it only reaches controls that
+ * share that parent: an app whose toolbar sits outside it attaches `keyRoot` to the element holding both.
  */
 export function useScorePlayer(options) {
     const host = useRef(null);
+    const keyRoot = useRef(null);
     const [player, setPlayer] = useState(null);
     const latest = useRef(options);
     latest.current = options;
@@ -71,21 +75,13 @@ export function useScorePlayer(options) {
             if (created.getState().status === "ready")
                 api.render();
         });
-        // The host takes focus so the keys reach it. The listener sits on its parent in the capture phase, which is
-        // where the app's controls live too, so a shortcut works with focus on any of them unless that control
-        // uses the key itself (targetUsesKey).
+        // The host takes focus so the keys reach it. The listener sits on the key root, or on the host's parent
+        // when the app names none.
         if (!element.hasAttribute("tabindex"))
             element.tabIndex = 0;
-        const keys = element.parentElement ?? element;
-        const onKeyDown = (event) => {
-            if (event.defaultPrevented || targetUsesKey(event.target, event.code))
-                return;
-            if (created.handleKey(event))
-                event.preventDefault();
-        };
-        keys.addEventListener("keydown", onKeyDown, true);
+        const stopKeys = listenForKeys(keyRoot.current ?? element.parentElement ?? element, (event) => created.handleKey(event));
         return () => {
-            keys.removeEventListener("keydown", onKeyDown, true);
+            stopKeys();
             stopTheme();
             created.dispose();
             api.destroy();
@@ -98,7 +94,7 @@ export function useScorePlayer(options) {
         player?.setBars(first === null || last === null ? null : { first, last });
     }, [player, first, last]);
     const state = useSyncExternalStore(player?.subscribe ?? subscribeNothing, player?.getState ?? (() => INITIAL_STATE), () => INITIAL_STATE);
-    return { host, state, actions: player ?? INERT_ACTIONS };
+    return { host, keyRoot, state, actions: player ?? INERT_ACTIONS };
 }
 function sourceIdentity(source) {
     if ("bytes" in source)

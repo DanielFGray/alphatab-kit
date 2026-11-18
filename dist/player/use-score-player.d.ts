@@ -18,6 +18,11 @@ export interface UseScorePlayerOptions extends ScorePlayerOptions {
 export interface UseScorePlayer {
     /** Attach to the element alphaTab draws into. The API exists after the first commit. */
     readonly host: RefObject<HTMLDivElement | null>;
+    /**
+     * Attach to the element that holds the score and the app's controls, so a shortcut works with focus on any of
+     * them. Read once, when the API is built. Unattached, the keys come from the host's parent.
+     */
+    readonly keyRoot: RefObject<HTMLDivElement | null>;
     readonly state: ScorePlayerState;
     readonly actions: ScorePlayerActions;
 }
@@ -27,5 +32,8 @@ export interface UseScorePlayer {
  * URL or tex text, so pass the same `Uint8Array` or `Score` across renders). The other options are read when the
  * API is built, except `bars`, which redraws the score without rebuilding, and the callbacks, which are read when
  * they are called. Browser only: it reads `location`.
+ *
+ * Keys go to the player from `keyRoot`. The host's parent is the default, and it only reaches controls that
+ * share that parent: an app whose toolbar sits outside it attaches `keyRoot` to the element holding both.
  */
 export declare function useScorePlayer(options: UseScorePlayerOptions): UseScorePlayer;

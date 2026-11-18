@@ -15,3 +15,9 @@ export interface KeyPress {
  * metronome and does not start playback.
  */
 export declare function targetUsesKey(target: EventTarget | null, code: string): boolean;
+/**
+ * Sends keydown events from anywhere under `root` to `handleKey`, which returns true when it used the key. The
+ * listener is in the capture phase, so the player sees a key before a control under `root` does, and it skips a key
+ * the target uses itself (targetUsesKey). Returns the function that removes it.
+ */
+export declare function listenForKeys(root: HTMLElement, handleKey: (event: KeyboardEvent) => boolean): () => void;

@@ -11,5 +11,20 @@ export function targetUsesKey(target, code) {
         return true;
     return code === "Space" && target.closest(PRESSABLE) !== null;
 }
+/**
+ * Sends keydown events from anywhere under `root` to `handleKey`, which returns true when it used the key. The
+ * listener is in the capture phase, so the player sees a key before a control under `root` does, and it skips a key
+ * the target uses itself (targetUsesKey). Returns the function that removes it.
+ */
+export function listenForKeys(root, handleKey) {
+    const onKeyDown = (event) => {
+        if (event.defaultPrevented || targetUsesKey(event.target, event.code))
+            return;
+        if (handleKey(event))
+            event.preventDefault();
+    };
+    root.addEventListener("keydown", onKeyDown, true);
+    return () => root.removeEventListener("keydown", onKeyDown, true);
+}
 const EDITABLE = "input, textarea, select, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='slider']";
 const PRESSABLE = "button, a[href], summary, [role='button'], [role='checkbox'], [role='switch'], [role='menuitem']";
