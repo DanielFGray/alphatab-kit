@@ -16,6 +16,11 @@ import type { Plugin } from "vite";
  * browser that cached an older copy would run an old worker beside a new main
  * thread after an alphaTab or patch upgrade.
  *
+ * It serves the click module's capture worklet the same way, at
+ * `CAPTURE_WORKLET_PATH`. A worklet falls under `script-src`, and a file on the
+ * app's own origin is covered by `'self'`, so the app's
+ * Content-Security-Policy needs no change.
+ *
  * `/alphatab/alphaTab.js` is the UMD build: alphaTab falls back to it through
  * `core.scriptFile` when it cannot start a module worker, and loads it with
  * `importScripts`, which cannot load an ES module.

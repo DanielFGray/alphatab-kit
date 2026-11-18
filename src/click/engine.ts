@@ -1,7 +1,7 @@
 import { Effect, Queue, Schedule, Schema, Scope, Stream } from "effect"
 import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, countInBeats } from "./click.ts"
 import { Session, type SessionEvent, type SessionPlan } from "./session.ts"
-import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.ts"
+import { CAPTURE_PROCESSOR_NAME, CAPTURE_WORKLET_PATH } from "./capture-worklet.ts"
 
 /**
  * `bpm` counts clicks, and `beatsPerBar` is the clicks in a bar, a whole
@@ -122,14 +122,9 @@ const hearMic = (
       device: track?.label || "the default microphone",
       reportedLatencyMs: reportedSeconds * 1000,
     })
-    yield* attempt("The browser could not load the audio processor.", async () => {
-      const url = captureWorkletUrl()
-      try {
-        await context.audioWorklet.addModule(url)
-      } finally {
-        URL.revokeObjectURL(url)
-      }
-    })
+    yield* attempt("The browser could not load the audio processor.", () =>
+      context.audioWorklet.addModule(CAPTURE_WORKLET_PATH),
+    )
 
     const session = new Session(plan)
     // The capture node outputs silence; its link to the destination keeps the browser running it.

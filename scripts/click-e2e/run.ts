@@ -1,8 +1,8 @@
 /**
  * Plays a synthetic take into the click parts through Chromium's fake
  * microphone, and checks the offsets the chart reports against the ones
- * played. The unit tests cannot reach this path: the worklet loading from a
- * Blob, the mic opened by its deviceId, and the hook folding the engine's events.
+ * played. The unit tests cannot reach this path: the worklet loading from
+ * its file, the mic opened by its deviceId, and the hook folding the engine's events.
  *
  * The fake microphone plays a WAV file: clicks at 100 BPM, as speakers would
  * put them into the mic, and from the 8th second drum hits at known offsets
@@ -14,6 +14,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { chromium, type Page } from "playwright-core"
+import { CAPTURE_WORKLET_PATH, captureWorkletSource } from "../../src/click/capture-worklet.ts"
 import { ACCENT_GAIN, BEAT_GAIN } from "../../src/click/click.ts"
 import { drum, mix, mixClick, noise, SAMPLE_RATE } from "../../src/click/synth.ts"
 
@@ -35,12 +36,17 @@ try {
   const script = await built.outputs[0]!.text()
   const server = Bun.serve({
     port: 0,
-    fetch: (request) =>
-      new URL(request.url).pathname === "/page.js"
+    fetch: (request) => {
+      const { pathname } = new URL(request.url)
+      // The worklet is a file the Vite plugin serves in an app; the test serves the same text.
+      if (pathname === CAPTURE_WORKLET_PATH)
+        return new Response(captureWorkletSource(), { headers: { "content-type": "text/javascript" } })
+      return pathname === "/page.js"
         ? new Response(script, { headers: { "content-type": "text/javascript" } })
         : new Response(`<!doctype html><div id="root"></div><script type="module" src="/page.js"></script>`, {
             headers: { "content-type": "text/html" },
-          }),
+          })
+    },
   })
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM ?? "/usr/bin/chromium",

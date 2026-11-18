@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { readFile, readdir } from "node:fs/promises"
 import path from "node:path"
 import type { Plugin } from "vite"
+import { CAPTURE_WORKLET_PATH, captureWorkletSource } from "./click/capture-worklet.ts"
 import { ALPHATAB_BASE, ALPHATAB_PACKAGE } from "./index.ts"
 
 /**
@@ -21,6 +22,11 @@ import { ALPHATAB_BASE, ALPHATAB_PACKAGE } from "./index.ts"
  * from there. Their names are fixed by alphaTab, so without the hash folder a
  * browser that cached an older copy would run an old worker beside a new main
  * thread after an alphaTab or patch upgrade.
+ *
+ * It serves the click module's capture worklet the same way, at
+ * `CAPTURE_WORKLET_PATH`. A worklet falls under `script-src`, and a file on the
+ * app's own origin is covered by `'self'`, so the app's
+ * Content-Security-Policy needs no change.
  *
  * `/alphatab/alphaTab.js` is the UMD build: alphaTab falls back to it through
  * `core.scriptFile` when it cannot start a module worker, and loads it with
@@ -54,6 +60,10 @@ export function alphaTabAssets(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         try {
           const url = (req.url ?? "").split("?", 1)[0] ?? ""
+          if (url === CAPTURE_WORKLET_PATH) {
+            res.setHeader("Content-Type", CONTENT_TYPES[".js"]!)
+            return void res.end(captureWorkletSource())
+          }
           if (!url.startsWith(ALPHATAB_BASE)) return next()
           const source = (await list()).get(decodeURIComponent(url.slice(ALPHATAB_BASE.length)))
           if (!source) return next()
@@ -72,6 +82,7 @@ export function alphaTabAssets(): Plugin {
     async generateBundle() {
       // The server build never starts workers or draws notation.
       if (this.environment?.config.consumer === "server") return
+      this.emitFile({ type: "asset", fileName: CAPTURE_WORKLET_PATH.slice(1), source: captureWorkletSource() })
       for (const [name, source] of await list()) {
         this.emitFile({ type: "asset", fileName: `alphatab/${name}`, source: await readFile(source) })
       }

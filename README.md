@@ -17,4 +17,4 @@ Browser music tools shared by dfg.codes, dfg.rocks and setlist.
 
 Apps install the kit as a git dependency on a tag (`"gigbag.js": "git+…#vX.Y.Z"`), so container builds see it like any other package. For local work across both repos, `bun link gigbag.js` (without `--save`) in the app replaces the installed copy with a symlink until the next install.
 
-`gigbag.js/click/engine` loads its audio worklet from a `blob:` URL. A page that sets a Content-Security-Policy needs `blob:` in `script-src` or `worker-src`.
+`gigbag.js/click/engine` loads its audio worklet from `/gigbag/capture-worklet.js`, a file the `gigbag.js/vite` plugin serves in development and emits in a build. A page that sets a Content-Security-Policy needs nothing beyond `script-src 'self'`: a worklet falls under `script-src`, not `worker-src`, and a same-origin file is covered by `'self'`.

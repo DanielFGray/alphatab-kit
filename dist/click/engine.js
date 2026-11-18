@@ -1,7 +1,7 @@
 import { Effect, Queue, Schedule, Schema, Stream } from "effect";
 import { ACCENT_GAIN, BEAT_GAIN, CLICK_ONSET_SECONDS, clickWaveform, countInBeats } from "./click.js";
 import { Session } from "./session.js";
-import { CAPTURE_PROCESSOR_NAME, captureWorkletUrl } from "./capture-worklet.js";
+import { CAPTURE_PROCESSOR_NAME, CAPTURE_WORKLET_PATH } from "./capture-worklet.js";
 /**
  * Plays the click from the first beat of the count-in until the stream is
  * interrupted, and emits each beat as it sounds. With `listen`, it also opens
@@ -75,15 +75,7 @@ const hearMic = (context, plan, micId, emit) => Effect.gen(function* () {
         device: track?.label || "the default microphone",
         reportedLatencyMs: reportedSeconds * 1000,
     });
-    yield* attempt("The browser could not load the audio processor.", async () => {
-        const url = captureWorkletUrl();
-        try {
-            await context.audioWorklet.addModule(url);
-        }
-        finally {
-            URL.revokeObjectURL(url);
-        }
-    });
+    yield* attempt("The browser could not load the audio processor.", () => context.audioWorklet.addModule(CAPTURE_WORKLET_PATH));
     const session = new Session(plan);
     // The capture node outputs silence; its link to the destination keeps the browser running it.
     const capture = new AudioWorkletNode(context, CAPTURE_PROCESSOR_NAME, { numberOfInputs: 1, numberOfOutputs: 1 });
