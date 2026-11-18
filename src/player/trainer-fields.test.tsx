@@ -23,8 +23,8 @@ const idle: TrainerProps = {
   onClearSelection: () => {},
 }
 
-function field(host: HTMLElement, part: string): HTMLInputElement | HTMLSelectElement {
-  const el = host.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-part='${part}']`)
+function field(host: HTMLElement, part: string): HTMLElement {
+  const el = host.querySelector<HTMLElement>(`[data-part='${part}']`)
   if (!el) throw new Error(`no ${part} rendered`)
   return el
 }
@@ -100,6 +100,20 @@ test("ticking Loop calls onLoop with the new state", () => {
   mounted = render(<TrainerFields {...idle} onLoop={(on) => picked.push(on)} speed={1} />)
   act(() => (field(mounted!.host, "loop") as HTMLInputElement).click())
   expect(picked).toEqual([true])
+})
+
+test("the clear control shows only while a passage is selected", () => {
+  mounted = render(<TrainerFields {...idle} speed={1} />)
+  expect(mounted.host.querySelector("[data-part='clear']")).toBeNull()
+  mounted.rerender(<TrainerFields {...idle} speed={1} selection="Bars 3–5" />)
+  expect(mounted.host.querySelector("[data-part='clear']")).not.toBeNull()
+})
+
+test("clicking the clear control calls onClearSelection", () => {
+  let cleared = 0
+  mounted = render(<TrainerFields {...idle} speed={1} selection="Bars 3–5" onClearSelection={() => cleared++} />)
+  act(() => (field(mounted!.host, "clear") as HTMLButtonElement).click())
+  expect(cleared).toBe(1)
 })
 
 test("typing a loop count calls onLoopCount with a number", () => {

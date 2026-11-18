@@ -19,7 +19,7 @@ export type TrainerProps = {
 
 export type TrainerFieldsProps = TrainerProps & {
   speed: number
-  parts?: Parts<"intro" | "tempo" | "row" | "loop" | "loopCount" | "step" | "stepMode">
+  parts?: Parts<"intro" | "tempo" | "clear" | "row" | "loop" | "loopCount" | "step" | "stepMode">
 }
 
 /**
@@ -37,6 +37,11 @@ export function TrainerFields({ speed, tempo, parts, ...props }: TrainerFieldsPr
       <p {...partProps(parts, "tempo")}>
         {props.selection ?? "Whole piece"} · {tempo === null ? `${speed}×` : `${tempo} BPM (${speed}×)`}
       </p>
+      {props.selection !== null && (
+        <button {...partProps(parts, "clear")} type="button" onClick={props.onClearSelection}>
+          Clear selection
+        </button>
+      )}
       <label {...partProps(parts, "row")}>
         <input
           {...partProps(parts, "loop")}

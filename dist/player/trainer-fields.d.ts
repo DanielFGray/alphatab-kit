@@ -17,7 +17,7 @@ export type TrainerProps = {
 };
 export type TrainerFieldsProps = TrainerProps & {
     speed: number;
-    parts?: Parts<"intro" | "tempo" | "row" | "loop" | "loopCount" | "step" | "stepMode">;
+    parts?: Parts<"intro" | "tempo" | "clear" | "row" | "loop" | "loopCount" | "step" | "stepMode">;
 };
 /**
  * The speed trainer's settings: the passage and tempo readout, the loop switch,
