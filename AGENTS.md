@@ -3,7 +3,7 @@
 What the kit holds, and how apps install it: README.md.
 
 - `dist/` is committed: apps do not build the kit on install, and Node cannot load TypeScript from `node_modules` when Vite loads `vite.config.ts`. Run `bun run build` before each commit; `src/dist.test.ts` fails when `dist/` is stale.
-- Commands: `bun test`, `bun run typecheck`, `bun run lint`, `bun run build`, and `bun fmt` (the [fmt] section in bunfig.toml; `bun fmt --check` must pass before each commit). `prepare` re-patches `tsc` and `oxlint` after every install. `bun run e2e` tests the click module in Chromium through a fake mic; it needs /usr/bin/chromium or CHROMIUM=<path>. Run it after changing src/click/.
+- Commands: `bun test`, `bun run typecheck`, `bun run lint`, `bun run build`, and `bun fmt` (the [fmt] section in bunfig.toml; `bun fmt --check` must pass before each commit). `prebuild`, `pretypecheck` and `prelint` run `effect-tsgo patch` before their tool, so the kit's `tsc` and `oxlint` are patched whenever the kit runs them. The patch is idempotent. It is not a lifecycle script: an app that installs the kit would see one as blocked. `bun run e2e` tests the click module in Chromium through a fake mic; it needs /usr/bin/chromium or CHROMIUM=<path>. Run it after changing src/click/.
 
 # Patches
 

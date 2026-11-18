@@ -39,11 +39,13 @@
     }
   },
   "scripts": {
+    "prebuild": "effect-tsgo patch --typescript --oxlint",
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
-    "prepare": "effect-tsgo patch --typescript --oxlint",
+    "pretypecheck": "effect-tsgo patch --typescript --oxlint",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "prelint": "effect-tsgo patch --typescript --oxlint",
     "lint": "oxlint --type-aware",
     "bench:voicing": "bun scripts/benchVoicing.ts",
     "e2e": "bun scripts/click-e2e/run.ts"
