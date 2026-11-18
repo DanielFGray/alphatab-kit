@@ -35,7 +35,10 @@ test("a client build emits the worker in the hashed folder and starts it from th
   const root = mkdtempSync(path.join(import.meta.dir, "..", ".vite-build-"))
   try {
     writeFileSync(path.join(root, "index.html"), `<script type="module" src="./main.js"></script>`)
-    writeFileSync(path.join(root, "main.js"), `import { AlphaTabApi } from "@coderline/alphatab"\nconsole.log(AlphaTabApi)\n`)
+    writeFileSync(
+      path.join(root, "main.js"),
+      `import { AlphaTabApi } from "@coderline/alphatab"\nconsole.log(AlphaTabApi)\n`,
+    )
     await build({ root, logLevel: "silent", configFile: false, plugins: [alphaTabAssets()] })
     const out = path.join(root, "dist")
     const [hashed] = readdirSync(path.join(out, "alphatab")).filter((name) => /^[0-9a-f]{10}$/.test(name))
